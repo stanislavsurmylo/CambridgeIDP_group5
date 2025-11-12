@@ -30,23 +30,30 @@ class Motor:
     def Stop(self):
         self.pwm.duty_u16(0)
 
-def RotateLeft(motor1, motor2, speed, duration):
-    motor1.Reverse(speed)
-    motor2.Forward(speed)
+def RotateLeft(motorA, motorB, speed, duration):
+    motorA.Reverse(speed)
+    motorB.Forward(speed)
     sleep(duration)
-    motor1.Stop()
-    motor2.Stop()
+    motorA.Stop()
+    motorB.Stop()
 
-def RotateRight(motor1, motor2, speed, duration):
-    motor1.Forward(speed)
-    motor2.Reverse(speed)
+def RotateRight(motorA, motorB, speed, duration):
+    motorA.Forward(speed)
+    motorB.Reverse(speed)
     sleep(duration)
-    motor1.Stop()
-    motor2.Stop()
+    motorA.Stop()
+    motorB.Stop()
+
+def Shift(motorA, motorB, speed, duration):
+    motorA.Forward(speed)
+    motorB.Forward(speed)
+    sleep(duration)
+    motorA.Stop()
+    motorB.Stop()
 
 def test_move():
-    motor1 = Motor(dirPin=4, PWMPin=5)  # Motor 3 is controlled from Motor Driv2 #1, which is on GP4/5
-    motor2 = Motor(dirPin=7, PWMPin=6)  # Motor 4 is controlled from Motor Driv2 #2, which is on GP6/7
+    motorA = Motor(dirPin=4, PWMPin=5)  # Motor 3 is controlled from Motor Driv2 #1, which is on GP4/5
+    motorB = Motor(dirPin=7, PWMPin=6)  # Motor 4 is controlled from Motor Driv2 #2, which is on GP6/7
 
 
 
@@ -54,45 +61,35 @@ def test_move():
         clr1 = sensor1.value()           # 0 for black or 1 for white
         clr2 = sensor2.value()           # 0 for black or 1 for white
         clr3 = sensor3.value()
-        last_state = None
+        last_state1 = None
 
         # Light LED when black line is detected
         led.value(clr1)
 
         # Print only on change to keep output tidy
         if clr2 == 0 or clr3 == 0:
-            if clr1 != last_state:
+            if clr1 != last_state1:
                 if clr1 == 0:
                     print("black")
-                    motor1.Stop()
-                    motor2.Stop()
+                    motorA.Stop()
+                    motorB.Stop()
                 else:
                     print("white")
-                    motor1.Forward(100)
-                    motor2.Forward(100)
+                    motorA.Forward(100)
+                    motorB.Forward(100)
                 last_state1 = clr1
         elif clr2 == 1 and clr3 == 0:
-            motor1.Forward(100)
-            motor2.Forward(100)
-            sleep(0.5)
-            motor1.Stop()
-            motor2.Stop()
-            RotateRight(motor1, motor2, 100, 0.3)
+            Shift(motorA, motorB, 100, 0.5)
+            RotateRight(motorA, motorB, 100, 0.3)
+            Shift(motorA, motorB, 100, 0.5)
         elif clr2 == 0 and clr3 == 1:
-            motor1.Forward(100)
-            motor2.Forward(100)
-            sleep(0.5)
-            motor1.Stop()
-            motor2.Stop()
-            RotateLeft(motor1, motor2, 100, 0.3)
+            Shift(motorA, motorB, 100, 0.5)
+            RotateLeft(motorA, motorB, 100, 0.3)
+            Shift(motorA, motorB, 100, 0.5)
         elif clr2 == 1 and clr3 == 1:
-            motor1.Forward(100)
-            motor2.Forward(100)
-            sleep(0.5)
-            motor1.Stop()
-            motor2.Stop()
-            RotateLeft(motor1, motor2, 100, 0.3)
-
+            Shift(motorA, motorB, 100, 0.5)
+            RotateLeft(motorA, motorB, 100, 0.3)
+            Shift(motorA, motorB, 100, 0.5)
 
             
             
