@@ -12,7 +12,7 @@ sensor3 = Pin(SENSOR_PIN3, Pin.IN)
 last_state = None
 
 class Motor:
-    def init(self, dirPin, PWMPin):
+    def __init__(self, dirPin, PWMPin):
         self.mDir = Pin(dirPin, Pin.OUT)  # set motor direction pin
         self.pwm = PWM(Pin(PWMPin))  # set motor pwm pin
         self.pwm.freq(1000)  # set PWM frequency
@@ -80,6 +80,11 @@ def test_move():
             motor1.Stop()
             motor2.Stop()
             RotateRight(motor1, motor2, speed, 0.3)
+            motor1.Forward(speed)
+            motor2.Forward(speed)
+            sleep(0.5)
+            motor1.Stop()
+            motor2.Stop()
         elif clr2 == 0 and clr3 == 1:
             motor1.Forward(speed)
             motor2.Forward(speed)
@@ -87,6 +92,12 @@ def test_move():
             motor1.Stop()
             motor2.Stop()
             RotateLeft(motor1, motor2, speed, 0.3)
+            motor1.Forward(speed)
+            motor2.Forward(speed)
+            sleep(0.5)
+            motor1.Stop()
+            motor2.Stop()
+            
         elif clr2 == 1 and clr3 == 1:
             motor1.Forward(speed)
             motor2.Forward(speed)
@@ -94,6 +105,12 @@ def test_move():
             motor1.Stop()
             motor2.Stop()
             RotateLeft(motor1, motor2, speed, 0.3)
+            motor1.Forward(speed)
+            motor2.Forward(speed)
+            sleep(0.5)
+            motor1.Stop()
+            motor2.Stop()
+            
 
 
             
@@ -102,6 +119,5 @@ def test_move():
 
 
 
-
-if name == "main":
+if __name__ == "__main__":
     test_move()
