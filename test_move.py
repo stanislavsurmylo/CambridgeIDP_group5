@@ -1,12 +1,9 @@
 from machine import Pin, PWM
 from time import sleep
 
-SENSOR_PIN = 12          # GP16 -> D0 (through level shifting / divider)
-LED_PIN = 28          # On-board LED
-
-# === SETUP ===
+SENSOR_PIN = 26           # GP26 (pin 31)
+led = Pin("LED", Pin.OUT) # on-board LED
 sensor = Pin(SENSOR_PIN, Pin.IN)
-led = Pin(LED_PIN, Pin.OUT)
 
 last_state = None
 
@@ -26,6 +23,8 @@ class Motor:
     def Reverse(self, speed=30):
         self.mDir.value(1)
         self.pwm.duty_u16(int(65535 * speed / 100))
+    def Stop(self):
+        self.pwm.duty_u16(0)
 
 def test_move():
     motor1 = Motor(dirPin=4, PWMPin=5)  # Motor 3 is controlled from Motor Driv2 #1, which is on GP4/5
@@ -34,6 +33,8 @@ def test_move():
     while True:
         clr = sensor.value()           # 0 for black or 1 for white
 
+        last_state = None
+
         # Light LED when black line is detected
         led.value(clr)
 
@@ -41,7 +42,8 @@ def test_move():
         if clr != last_state:
             if clr == 0:
                 print("black")
-
+                motor1.Stop()
+                motor2.Stop()
             else:
                 print("white")
                 motor1.Forward()
