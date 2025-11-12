@@ -21,7 +21,7 @@ class Motor:
 
 def test_motor3():
     motor1 = Motor(dirPin=4, PWMPin=5)  # Motor 3 is controlled from Motor Driv2 #1, which is on GP4/5
-    motor2 = Motor(dirPin=6, PWMPin=7)  # Motor 4 is controlled from Motor Driv2 #2, which is on GP6/7
+    motor2 = Motor(dirPin=7, PWMPin=6)  # Motor 4 is controlled from Motor Driv2 #2, which is on GP6/7
     while True:
         print("Forward")
         motor1.Forward()
