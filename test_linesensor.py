@@ -7,7 +7,7 @@ SENSOR_PIN = 12          # GP16 -> D0 (through level shifting / divider)
 LED_PIN = 28          # On-board LED
 
 # === SETUP ===
-sensor = Pin(SENSOR_PIN, Pin.IN) 
+sensor = Pin(SENSOR_PIN, Pin.IN)
 led = Pin(LED_PIN, Pin.OUT)
 
 last_state = None
