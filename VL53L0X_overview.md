@@ -16,3 +16,4 @@
 - Readings are 1 mm resolution, accuracy about ±3%
 - Keep sensor still during init; avoid covering the aperture
 
+
