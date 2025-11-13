@@ -1,0 +1,162 @@
+from machine import Pin, PWM
+from time import sleep
+
+SENSOR_PIN_BACK   = 26  # GP26 (pin 31)
+SENSOR_PIN_LEFT   = 27  # GP27 (pin 32)
+SENSOR_PIN_RIGHT  = 28  # GP28 (pin 34)
+SENSOR_PIN_CENTER = 12  # GP12 (pin 15)
+
+led = Pin("LED", Pin.OUT)  # on-board LED
+
+sensor_back   = Pin(SENSOR_PIN_BACK,   Pin.IN)
+sensor_left   = Pin(SENSOR_PIN_LEFT,   Pin.IN)
+sensor_right  = Pin(SENSOR_PIN_RIGHT,  Pin.IN)
+sensor_center = Pin(SENSOR_PIN_CENTER, Pin.IN)
+
+# --- Tunables (adjust to taste) ---
+SPEED_FWD      = 55   # % for forward cruising
+SPEED_TURN     = 50   # % for spins
+SPEED_PIVOT    = 42   # % when pivoting around one wheel
+SHIFT_MS       = 120  # small forward shift before spins
+CHECK_MS       = 10   # loop wait while checking sensors
+#TIMEOUT_MS     = 1500 # max time to search before giving up
+
+def is_line(v):
+    """Return True if the sensor is over the line.
+       Typical digital line sensors: 0 = line (black), 1 = floor (white)."""
+    return v == 0
+
+class Motor:
+    def __init__(self, dirPin, PWMPin):
+        self.mDir = Pin(dirPin, Pin.OUT)
+        self.pwm = PWM(Pin(PWMPin))
+        self.pwm.freq(1000)
+        self.pwm.duty_u16(0)
+
+    def off(self):
+        self.pwm.duty_u16(0)
+
+    def Forward(self, speed):
+        self.mDir.value(0)
+        self.pwm.duty_u16(int(65535 * speed / 100))
+
+    def Reverse(self, speed):
+        self.mDir.value(1)
+        self.pwm.duty_u16(int(65535 * speed / 100))
+
+    def Stop(self):
+        self.pwm.duty_u16(0)
+
+# Convenience wrappers (assuming motorA = LEFT, motorB = RIGHT).
+def go_forward(mA, mB, speed):
+    mA.Forward(speed)
+    mB.Forward(speed)
+
+def stop_all(mA, mB):
+    mA.Stop()
+    mB.Stop()
+
+def rotate_left(mA, mB, speed):
+    # Left wheel backward, right wheel forward
+    mA.Reverse(speed)
+    mB.Forward(speed)
+
+def rotate_right(mA, mB, speed):
+    # Left wheel forward, right wheel backward
+    mA.Forward(speed)
+    mB.Reverse(speed)
+
+def pivot_right(mA, mB, speed):
+    # Left wheel stationary, right wheel backward => yaw to the RIGHT
+    mA.Stop()
+    mB.Reverse(speed)
+
+def pivot_left(mA, mB, speed):
+    # Right wheel stationary, left wheel backward => yaw to the LEFT
+    mB.Stop()
+    mA.Reverse(speed)
+
+def shift_forward(mA, mB, speed, ms):
+    go_forward(mA, mB, speed)
+    sleep(ms / 1000)
+    stop_all(mA, mB)
+
+def rotation_check():
+    while True:
+        if is_line(sensor_center.value()):
+            return True
+        sleep(CHECK_MS / 1000)
+
+def test_move():
+    # ASSUMPTION: motorA = LEFT, motorB = RIGHT. Swap if needed.
+    motorA = Motor(dirPin=4, PWMPin=5)  # LEFT  motor on GP4/GP5
+    motorB = Motor(dirPin=7, PWMPin=6)  # RIGHT motor on GP6/GP7
+
+    while True:
+        # Read raw sensor values (0=line, 1=not line)
+        raw_b = sensor_back.value()
+        raw_l = sensor_left.value()
+        raw_r = sensor_right.value()
+        raw_c = sensor_center.value()
+
+        # Convert to booleans: True when on line
+        on_back   = is_line(raw_b)
+        on_left   = is_line(raw_l)
+        on_right  = is_line(raw_r)
+        on_center = is_line(raw_c)
+
+        # LED ON when any sensor is on the line (handy heartbeat)
+        led.value(1 if (on_back or on_left or on_right or on_center) else 0)
+
+        # --- Core behaviour ---
+
+        # 1) Center & back both see the line ⇒ go straight
+        if on_center and on_back:
+            go_forward(motorA, motorB, SPEED_FWD)
+            sleep(CHECK_MS / 1000)
+            continue
+
+        # 2) Side sees line (priority to RIGHT), do:
+        #    (a) short forward shift
+        #    (b) spin-in-place toward that side until center sees line again
+        if on_right or on_left and on_center:
+            # Priority to right if both true
+            if on_right:
+                shift_forward(motorA, motorB, SPEED_FWD, SHIFT_MS)
+                # Spin RIGHT on the spot until center reacquires
+                rotate_right(motorA, motorB, SPEED_TURN)
+                x = rotation_check()
+                stop_all(motorA, motorB)
+            else:
+                # Left only
+                shift_forward(motorA, motorB, SPEED_FWD, SHIFT_MS)
+                # Spin LEFT on the spot until center reacquires
+                rotate_left(motorA, motorB, SPEED_TURN)
+                x = rotation_check()
+                stop_all(motorA, motorB)
+
+            # After handling a side event, loop
+            sleep(CHECK_MS / 1000)
+            continue
+
+        # 3) If center LOST the line but a side sensor has it:
+        #    “turn around the opposite wheel to get back on the line”
+        #    (Right sees line: keep LEFT stationary, drive RIGHT backward → yaw RIGHT)
+        if not on_center and (on_right or on_left):
+            if on_right:
+                pivot_right(motorA, motorB, SPEED_PIVOT)
+                rotation_check()
+                stop_all(motorA, motorB)
+            else:  # on_left
+                pivot_left(motorA, motorB, SPEED_PIVOT)
+                rotation_check()
+                stop_all(motorA, motorB)
+            sleep(CHECK_MS / 1000)
+            continue
+
+        # 4) Fallback: if nothing is detected clearly, stop briefly (or creep forward)
+        stop_all(motorA, motorB)
+        sleep(CHECK_MS / 1000)
+
+if __name__ == "__main__":
+    test_move()
