@@ -111,9 +111,6 @@ def test_move():
         on_right  = is_line(raw_r)
         on_center = is_line(raw_c)
 
-        # LED ON when any sensor is on the line (handy heartbeat)
-        led.value(1 if (on_back or on_left or on_right or on_center) else 0)
-
         # --- Core behaviour ---
 
         # 1) Center & back both see the line ⇒ go straight
