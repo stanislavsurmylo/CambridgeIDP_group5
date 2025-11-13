@@ -11,7 +11,7 @@ def setup_sensor():
     i2c_bus = I2C(id=I2C_ID, sda=Pin(PIN_SDA), scl=Pin(PIN_SCL))
 
     try:
-        from libs.VL53L0X.VL53L0X import VL53L0X
+        from libs.VL53L0X import VL53L0X
     except ImportError as e:
         raise RuntimeError("VL53L0X driver not found") from e
     sensor = VL53L0X(i2c_bus)

@@ -1,6 +1,11 @@
 from machine import I2C, Pin
 from utime import sleep
 
+try:
+    from libs.tcs3472 import tcs3472
+except ImportError:
+    from TCS3472 import tcs3472
+
 
 I2C_ID = 0
 PIN_SDA = 4
@@ -10,11 +15,6 @@ SAMPLE_INTERVAL_SECONDS = 1.0
 
 def setup_sensor():
     i2c_bus = I2C(id=I2C_ID, sda=Pin(PIN_SDA), scl=Pin(PIN_SCL))
-
-    try:
-        from libs.tcs3472_micropython.tcs3472 import tcs3472
-    except ImportError as e:
-        raise RuntimeError("Missing driver") from e
     return tcs3472(i2c_bus)
 
 
