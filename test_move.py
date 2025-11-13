@@ -66,36 +66,40 @@ def test_move():
         # Light LED when black line is detected
         led.value(clr1)
 
-        speed0 = 70
-        time0 = 1
-
         # Print only on change to keep output tidy
-        if clr2 == 0 and clr3 == 0:
+        if clr2 == 0 or clr3 == 0:
             if clr1 != last_state1:
                 if clr1 == 0:
                     print("black")
                     motorA.Stop()
                     motorB.Stop()
                 else:
-                    print("white1")
-                    motorA.Forward(speed0)
-                    motorB.Forward(speed0)
+                    print("white")
+                    motorA.Forward(100)
+                    motorB.Forward(100)
                 last_state1 = clr1
         elif clr2 == 1 and clr3 == 0:
-            print("white2")
-            Shift(motorA, motorB, speed0, 0.5)
-            RotateRight(motorA, motorB, speed0, time0)
-            Shift(motorA, motorB, speed0, 0.5)
+            motor1.Forward(speed)
+            motor2.Forward(speed)
+            sleep(0.5)
+            motor1.Stop()
+            motor2.Stop()
+            RotateRight(motor1, motor2, speed, 0.3)
         elif clr2 == 0 and clr3 == 1:
-            print("white3")
-            Shift(motorA, motorB, speed0, 0.5)
-            RotateLeft(motorA, motorB, speed0, time0)
-            Shift(motorA, motorB, speed0, 0.5)
+            motor1.Forward(speed)
+            motor2.Forward(speed)
+            sleep(0.5)
+            motor1.Stop()
+            motor2.Stop()
+            RotateLeft(motor1, motor2, speed, 0.3)
         elif clr2 == 1 and clr3 == 1:
-            print("white4")
-            Shift(motorA, motorB, speed0, 0.5)
-            RotateLeft(motorA, motorB, speed0, time0)
-            Shift(motorA, motorB, speed0, 0.5)
+            motor1.Forward(speed)
+            motor2.Forward(speed)
+            sleep(0.5)
+            motor1.Stop()
+            motor2.Stop()
+            RotateLeft(motor1, motor2, speed, 0.3)
+
 
             
             
@@ -104,5 +108,5 @@ def test_move():
 
 
 
-if __name__ == "__main__":
+if name == "main":
     test_move()
