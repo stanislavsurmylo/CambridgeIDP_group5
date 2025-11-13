@@ -98,6 +98,11 @@ def rotation_check():
         if is_line(sensor_center.value()):
             return True
         #sleep(CHECK_MS / 1000)
+def rotation_check_any():
+    while True:
+        if is_line(sensor_center.value()) or is_line(sensor_left.value()) or is_line(sensor_right.value()):
+            return True
+        #sleep(CHECK_MS / 1000)
 
 def test_move():
     global branch_idx  # <-- routing index
