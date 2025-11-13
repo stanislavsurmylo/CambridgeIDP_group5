@@ -79,17 +79,27 @@ def test_move():
                     motorB.Forward(100)
                 last_state1 = clr1
         elif clr2 == 1 and clr3 == 0:
-            Shift(motorA, motorB, 100, 0.5)
-            RotateRight(motorA, motorB, 100, 0.3)
-            Shift(motorA, motorB, 100, 0.5)
+            motor1.Forward(speed)
+            motor2.Forward(speed)
+            sleep(0.5)
+            motor1.Stop()
+            motor2.Stop()
+            RotateRight(motor1, motor2, speed, 0.3)
         elif clr2 == 0 and clr3 == 1:
-            Shift(motorA, motorB, 100, 0.5)
-            RotateLeft(motorA, motorB, 100, 0.3)
-            Shift(motorA, motorB, 100, 0.5)
+            motor1.Forward(speed)
+            motor2.Forward(speed)
+            sleep(0.5)
+            motor1.Stop()
+            motor2.Stop()
+            RotateLeft(motor1, motor2, speed, 0.3)
         elif clr2 == 1 and clr3 == 1:
-            Shift(motorA, motorB, 100, 0.5)
-            RotateLeft(motorA, motorB, 100, 0.3)
-            Shift(motorA, motorB, 100, 0.5)
+            motor1.Forward(speed)
+            motor2.Forward(speed)
+            sleep(0.5)
+            motor1.Stop()
+            motor2.Stop()
+            RotateLeft(motor1, motor2, speed, 0.3)
+
 
             
             
@@ -98,5 +108,5 @@ def test_move():
 
 
 
-if __name__ == "__main__":
+if name == "main":
     test_move()

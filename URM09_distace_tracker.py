@@ -11,7 +11,7 @@ VREF_VOLTS = 3.3         # Pico reference voltage
 CM_PER_VOLT = 100.0
 
 
-def read_distance_cm(distance_adc: ADC) -> float:
+def URM09_read_distance(distance_adc: ADC) -> float:
     raw = distance_adc.read_u16()
     voltage = (raw / ADC_MAX_READING) * VREF_VOLTS
     distance_cm = voltage * CM_PER_VOLT
@@ -23,7 +23,7 @@ def main():
     print("URM09 analog distance reader (every 0.5s).")
     while True:
         try:
-            distance = read_distance_cm(distance_adc)
+            distance = URM09_read_distance(distance_adc)
             print("Distance: {:.1f} cm".format(distance))
             time.sleep(SAMPLE_INTERVAL_SECONDS)
         except KeyboardInterrupt:
