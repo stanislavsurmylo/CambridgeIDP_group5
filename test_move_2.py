@@ -27,8 +27,8 @@ def is_line(v):
 # ----------------- HARD-CODED RED-LINE ROUTE -----------------
 # Branch decisions (only when center is on main line):
 # 'L' turn left, 'R' turn right, 'S' keep straight (ignore the branch)
-BRANCH_ROUTE = ['R','L','S','S','S','S','S','S','S','L','S','L','S','S','S','S','S','S','S','L','S','R']
-branch_idx = -1
+BRANCH_ROUTE = ['R', 'L','S','S','S','S','S','S','S','L','S','L','S','S','S','S','S','S','S','L','S','R']
+branch_idx = 0
 # -------------------------------------------------------------
 
 class Node:
@@ -98,13 +98,6 @@ def rotation_check():
         if is_line(sensor_center.value()):
             return True
         #sleep(CHECK_MS / 1000)
-def rotation_check_any():
-    while True:
-        if (is_line(sensor_center.value()) or
-            is_line(sensor_left.value()) or
-            is_line(sensor_right.value())):
-            return True
-        #sleep(CHECK_MS / 1000)
 
 def test_move():
     global branch_idx  # <-- routing index
@@ -131,11 +124,6 @@ def test_move():
             go_forward(motorL, motorR, SPEED_FWD)
             #sleep(CHECK_MS / 1000)
             continue
-
-        if on_back and not on_center:
-            rotate_right(motorL, motorR, SPEED_TURN//5)
-            rotation_check_any()
-            stop_all(motorL, motorR)
 
         # 2) Side sees line (priority to RIGHT) BUT now gated by the route:
         #    (a) short forward shift
