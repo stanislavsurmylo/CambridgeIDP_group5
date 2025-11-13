@@ -1,3 +1,10 @@
+# tcs3472.py
+# A MicroPython library for the TCS3472 light sensing chip
+# https://github.com/tti0/tcs3472-micropython
+
+# Copyright (c) 2021 tti0
+# Licensed under the MIT License
+
 import struct
 
 class tcs3472:
