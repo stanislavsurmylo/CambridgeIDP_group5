@@ -1,10 +1,10 @@
 from machine import Pin, PWM
 from time import sleep
 
-SENSOR_PIN_BACK   = 21  # GP26 (pin 31)
-SENSOR_PIN_LEFT   = 20  # GP27 (pin 32)
-SENSOR_PIN_RIGHT  = 19  # GP28 (pin 34)
-SENSOR_PIN_CENTER = 18  # GP12 (pin 15)
+SENSOR_PIN_BACK   = 21  # GP21 (pin 27)
+SENSOR_PIN_LEFT   = 20  # GP20 (pin 26)
+SENSOR_PIN_RIGHT  = 19  # GP19 (pin 25)
+SENSOR_PIN_CENTER = 18  # GP18 (pin 24)
 
 led = Pin("LED", Pin.OUT)  # on-board LED
 
@@ -132,6 +132,7 @@ def test_move():
             #sleep(CHECK_MS / 1000)
             continue
 
+        # 1b) Back sees line but center does NOT ⇒ recover to additional sensor by turning right
         if on_back and not on_center:
             rotate_right(motorL, motorR, SPEED_TURN//5)
             rotation_check_any()
