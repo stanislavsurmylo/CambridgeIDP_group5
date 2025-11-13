@@ -1,10 +1,10 @@
 from machine import Pin, PWM
 from time import sleep
 
-SENSOR_PIN_BACK   = 26  # GP26 (pin 31)
-SENSOR_PIN_LEFT   = 27  # GP27 (pin 32)
-SENSOR_PIN_RIGHT  = 28  # GP28 (pin 34)
-SENSOR_PIN_CENTER = 12  # GP12 (pin 15)
+SENSOR_PIN_BACK   = 21  # GP26 (pin 31)
+SENSOR_PIN_LEFT   = 20  # GP27 (pin 32)
+SENSOR_PIN_RIGHT  = 19  # GP28 (pin 34)
+SENSOR_PIN_CENTER = 18  # GP12 (pin 15)
 
 led = Pin("LED", Pin.OUT)  # on-board LED
 
@@ -16,14 +16,20 @@ sensor_center = Pin(SENSOR_PIN_CENTER, Pin.IN)
 # --- Tunables (adjust to taste) ---
 SPEED_FWD      = 100   # % for forward cruising
 SPEED_TURN     = 100   # % for spins
-SPEED_PIVOT    = 40   # % when pivoting around one wheel
-SHIFT_MS       = 120  # small forward shift before spins
-CHECK_MS       = 10   # loop wait while checking sensors
+SPEED_PIVOT    = 40    # % when pivoting around one wheel
+SHIFT_MS       = 120   # small forward shift before spins
+CHECK_MS       = 10    # loop wait while checking sensors
 #TIMEOUT_MS     = 1500 # max time to search before giving up
 
 def is_line(v):
     return v == 1
 
+# ----------------- HARD-CODED RED-LINE ROUTE -----------------
+# Branch decisions (only when center is on main line):
+# 'L' turn left, 'R' turn right, 'S' keep straight (ignore the branch)
+BRANCH_ROUTE = ['R', 'L','S','S','S','S','S','S','S','L','S','L','S','S','S','S','S','S','S','L','S','R']
+branch_idx = 0
+# -------------------------------------------------------------
 
 class Node:
     def __init__(self, is_start=False, is_end=False):
@@ -31,7 +37,6 @@ class Node:
         self.is_end = is_end
         self.adj_nodes = []
         self.is_load_node = False
-
 
 class Motor:
     def __init__(self, dirPin, PWMPin):
@@ -95,6 +100,7 @@ def rotation_check():
         #sleep(CHECK_MS / 1000)
 
 def test_move():
+    global branch_idx  # <-- routing index
     motorL = Motor(dirPin=4, PWMPin=5)  # LEFT  motor on GP4/GP5
     motorR = Motor(dirPin=7, PWMPin=6)  # RIGHT motor on GP6/GP7
 
@@ -119,32 +125,38 @@ def test_move():
             #sleep(CHECK_MS / 1000)
             continue
 
-        # 2) Side sees line (priority to RIGHT), do:
+        # 2) Side sees line (priority to RIGHT) BUT now gated by the route:
         #    (a) short forward shift
-        #    (b) spin-in-place toward that side until center sees line again
-        if on_right or on_left and on_center:
-            # Priority to right if both true
-            if on_right:
-                shift_forward(motorL, motorR, SPEED_FWD, SHIFT_MS)
-                # Spin RIGHT on the spot until center reacquires
-                rotate_right(motorL, motorR, SPEED_TURN)
-                x = rotation_check()
-                stop_all(motorL, motorR)
-            else:
-                # Left only
-                shift_forward(motorL, motorR, SPEED_FWD, SHIFT_MS)
-                # Spin LEFT on the spot until center reacquires
-                rotate_left(motorL, motorR, SPEED_TURN)
-                x = rotation_check()
-                stop_all(motorL, motorR)
+        #    (b) turn as prescribed by BRANCH_ROUTE; otherwise ignore (go straight)
+        if (on_right or on_left) and on_center:
+            # Decide what to do at this branch
+            if branch_idx < len(BRANCH_ROUTE):
+                action = BRANCH_ROUTE[branch_idx]
+                branch_idx += 1  # consume this branch event
 
-            # After handling a side event, loop
-            #sleep(CHECK_MS / 1000)
-            #continue
+            if action == 'S':
+                # ignore this spur, just clear the node
+                shift_forward(motorL, motorR, SPEED_FWD, SHIFT_MS)
+                continue
+            elif action == 'R' and on_right:
+                shift_forward(motorL, motorR, SPEED_FWD, SHIFT_MS)
+                rotate_right(motorL, motorR, SPEED_TURN)
+                rotation_check()
+                stop_all(motorL, motorR)
+                continue
+            elif action == 'L' and on_left:
+                shift_forward(motorL, motorR, SPEED_FWD, SHIFT_MS)
+                rotate_left(motorL, motorR, SPEED_TURN)
+                rotation_check()
+                stop_all(motorL, motorR)
+                continue
+            else:
+                # Desired turn not available in this instant; ignore and keep moving
+                shift_forward(motorL, motorR, SPEED_FWD, SHIFT_MS)
+                continue
 
         # 3) If center LOST the line but a side sensor has it:
-        #    “turn around the opposite wheel to get back on the line”
-        #    (Right sees line: keep LEFT stationary, drive RIGHT backward → yaw RIGHT)
+        #    corners (outer loop) handled as before
         if not on_center and (on_right or on_left):
             if on_right:
                 pivot_right(motorL, motorR, SPEED_PIVOT)
@@ -155,9 +167,9 @@ def test_move():
                 rotation_check()
                 stop_all(motorL, motorR)
             #sleep(CHECK_MS / 1000)
-            #continue
+            continue
 
-        # 4) Fallback: if nothing is detected clearly, stop briefly (or creep forward)
+        # 4) Fallback
         stop_all(motorL, motorR)
         sleep(CHECK_MS / 1000)
 
