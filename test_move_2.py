@@ -17,8 +17,8 @@ sensor_center = Pin(SENSOR_PIN_CENTER, Pin.IN)
 SPEED_FWD      = 100   # % for forward cruising
 SPEED_TURN     = 100   # % for spins
 SPEED_PIVOT    = 40    # % when pivoting around one wheel
-SHIFT_MS       = 120   # small forward shift before spins
-CHECK_MS       = 10    # loop wait while checking sensors
+SHIFT_MS       = 220   # small forward shift before spins
+CHECK_MS       = 20    # delay for checking sensors
 #TIMEOUT_MS     = 1500 # max time to search before giving up
 
 def is_line(v):
@@ -60,6 +60,10 @@ class Motor:
         self.pwm.duty_u16(0)
 
 # Convenience wrappers (assuming motorL = LEFT, motorR = RIGHT).
+def go_backward(mL, mR, speed):
+    mL.Reverse(speed)
+    mR.Reverse(speed)
+
 def go_forward(mL, mR, speed):
     mL.Forward(speed)
     mR.Forward(speed)
@@ -93,14 +97,24 @@ def shift_forward(mL, mR, speed, ms):
     sleep(ms / 1000)
     stop_all(mL, mR)
 
-def rotation_check():
+def center_check():
     while True:
         if is_line(sensor_center.value()):
+            sleep(CHECK_MS / 1000)
             return True
         #sleep(CHECK_MS / 1000)
-def rotation_check_any():
+
+def back_check():
+    while True:
+        if is_line(sensor_back.value()):
+            sleep(CHECK_MS / 1000)
+            return True
+        #sleep(CHECK_MS / 1000)
+
+def any_check():
     while True:
         if is_line(sensor_center.value()) or is_line(sensor_left.value()) or is_line(sensor_right.value()):
+            sleep(CHECK_MS / 1000)
             return True
         #sleep(CHECK_MS / 1000)
 
@@ -121,19 +135,28 @@ def test_move():
         on_left   = is_line(raw_l)
         on_right  = is_line(raw_r)
         on_center = is_line(raw_c)
+        
+        print(f"B:{on_back} L:{on_left} C:{on_center} R:{on_right}")
 
         # --- Core behaviour ---
+        # 0) If BACK sensor lost the line, go backward until it finds it
+        if not on_back:
+            go_backward(motorL, motorR, SPEED_FWD)
+            back_check()
+            stop_all(motorL, motorR)
 
-        # 1) Center & back both see the line ⇒ go straight
-        if on_back and on_center:
-            go_forward(motorL, motorR, SPEED_FWD)
             #sleep(CHECK_MS / 1000)
             continue
 
+        # 1) Center & back both see the line ⇒ go straight
+        if on_back and on_center and not on_left and not on_right:
+            go_forward(motorL, motorR, SPEED_FWD)
+            #sleep(CHECK_MS / 1000)
+
         # 1b) Back sees line but center does NOT ⇒ recover to additional sensor by turning right
-        if on_back and not on_center:
-            rotate_right(motorL, motorR, SPEED_TURN//5)
-            rotation_check_any()
+        if on_back and not on_center and not on_right and not on_left:
+            rotate_right(motorL, motorR, SPEED_TURN//2)
+            any_check()
             stop_all(motorL, motorR)
 
         # 2) Side sees line (priority to RIGHT) BUT now gated by the route:
@@ -141,48 +164,54 @@ def test_move():
         #    (b) turn as prescribed by BRANCH_ROUTE; otherwise ignore (go straight)
         if (on_right or on_left) and on_center:
             # Decide what to do at this branch
-            if branch_idx < len(BRANCH_ROUTE):
-                action = BRANCH_ROUTE[branch_idx]
-                branch_idx += 1  # consume this branch event
+            # if branch_idx < len(BRANCH_ROUTE):
+            #     action = BRANCH_ROUTE[branch_idx]
+            #     branch_idx += 1  # consume this branch event
 
-            if action == 'S':
-                # ignore this spur, just clear the node
-                shift_forward(motorL, motorR, SPEED_FWD, SHIFT_MS)
-                continue
-            elif action == 'R' and on_right:
+            # if action == 'S':
+            #     # ignore this spur, just clear the node
+            #     shift_forward(motorL, motorR, SPEED_FWD, SHIFT_MS)
+            #     continue
+            # elif action == 'R' and on_right:
+            #     shift_forward(motorL, motorR, SPEED_FWD, SHIFT_MS)
+            #     rotate_right(motorL, motorR, SPEED_TURN)
+            #     center_check()
+            #     stop_all(motorL, motorR)
+            #     continue
+            # elif action == 'L' and on_left:
+            #     shift_forward(motorL, motorR, SPEED_FWD, SHIFT_MS)
+            #     rotate_left(motorL, motorR, SPEED_TURN)
+            #     center_check()
+            #     stop_all(motorL, motorR)
+            #     continue
+            # else:
+            #     # Desired turn not available in this instant; ignore and keep moving
+            #     shift_forward(motorL, motorR, SPEED_FWD, SHIFT_MS)
+            #     continue
+            if on_right:
                 shift_forward(motorL, motorR, SPEED_FWD, SHIFT_MS)
                 rotate_right(motorL, motorR, SPEED_TURN)
-                rotation_check()
+                center_check()
                 stop_all(motorL, motorR)
-                continue
-            elif action == 'L' and on_left:
+            elif on_left:
                 shift_forward(motorL, motorR, SPEED_FWD, SHIFT_MS)
                 rotate_left(motorL, motorR, SPEED_TURN)
-                rotation_check()
+                center_check()
                 stop_all(motorL, motorR)
-                continue
-            else:
-                # Desired turn not available in this instant; ignore and keep moving
-                shift_forward(motorL, motorR, SPEED_FWD, SHIFT_MS)
-                continue
 
         # 3) If center LOST the line but a side sensor has it:
         #    corners (outer loop) handled as before
         if not on_center and (on_right or on_left):
             if on_right:
-                pivot_right(motorL, motorR, SPEED_PIVOT)
-                rotation_check()
+                rotate_right(motorL, motorR, SPEED_PIVOT)
+                center_check()
                 stop_all(motorL, motorR)
             else:  # on_left
-                pivot_left(motorL, motorR, SPEED_PIVOT)
-                rotation_check()
+                rotate_left(motorL, motorR, SPEED_PIVOT)
+                center_check()
                 stop_all(motorL, motorR)
             #sleep(CHECK_MS / 1000)
             continue
-
-        # 4) Fallback
-        stop_all(motorL, motorR)
-        sleep(CHECK_MS / 1000)
 
 if __name__ == "__main__":
     test_move()
