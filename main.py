@@ -1,220 +1,185 @@
+# four_sensor_table_arc.py — 4-bit follower + debounced arc turns
 from machine import Pin, PWM
-from time import sleep
+from time import sleep_ms, ticks_ms, ticks_diff
 
-SENSOR_PIN_BRIGHT   = 21  # GP21 (pin 27)
-SENSOR_PIN_FLEFT   = 20  # GP20 (pin 26)
-SENSOR_PIN_FRIGHT  = 19  # GP19 (pin 25)
-SENSOR_PIN_BLEFT = 18  # GP18 (pin 24)
+# ----- SENSORS (left->right). Swap sFL,sFR wires here if needed -----
+S_FL = Pin(20, Pin.IN)   # front-left  (outer)
+S_BL = Pin(21, Pin.IN)   # back-left   (inner)
+S_BR = Pin(18, Pin.IN)   # back-right  (inner)
+S_FR = Pin(19, Pin.IN)   # front-right (outer)
+WHITE_LEVEL = 1
+def W(x): return x == WHITE_LEVEL
 
-led = Pin("LED", Pin.OUT)  # on-board LED
+branch_route = ['R','L','L','L','L','R']  # sequence of turns at branches
+branch_index = 0
 
-sensor_bright   = Pin(SENSOR_PIN_BRIGHT,   Pin.IN)
-sensor_fleft   = Pin(SENSOR_PIN_FLEFT,   Pin.IN)
-sensor_fright  = Pin(SENSOR_PIN_FRIGHT,  Pin.IN)
-sensor_bleft = Pin(SENSOR_PIN_BLEFT, Pin.IN)
-
-
-SPEED_FWD      = 100   # % for forward cruising
-SPEED_BACK     = 60   # % for reversing when lost
-SHIFT_COEF     = 100/210  # proportion of SPEED_FWD for SHIFT_MS
-SPEED_TURN     = 80   # % for spins
-SPEED_PIVOT    = 40    # % when pivoting around one wheel
-SHIFT_MS       = SPEED_FWD / SHIFT_COEF   # small forward shift before spins
-CHECK_MS       = 200
-DELAY_MS       = 20
-# delay for checking sensors
-#TIMEOUT_MS     = 1500 # max time to search before giving up
-
-def is_line(v):
-    return v == 1
-
-# ----------------- HARD-CODED RED-LINE ROUTE -----------------
-# Branch decisions (only when center is on main line):
-# 'L' turn left, 'R' turn right, 'S' keep straight (ignore the branch)
-BRANCH_ROUTE = ['R','L','S','S','S','S','S','S','S','L','S','L','S','S','S','S','S','S','S','L','S','R']
-branch_idx = 0
-# -------------------------------------------------------------
-
-class Node:
-    def __init__(self, is_start=False, is_end=False):
-        self.is_start = is_start
-        self.is_end = is_end
-        self.adj_nodes = []
-        self.is_load_node = False
+# ----- MOTORS -----
+INVERT_LEFT  = False     # flip these until forward() drives robot forward
+INVERT_RIGHT = False
 
 class Motor:
-    def __init__(self, dirPin, PWMPin):
-        self.mDir = Pin(dirPin, Pin.OUT)
-        self.pwm = PWM(Pin(PWMPin))
-        self.pwm.freq(1000)
-        self.pwm.duty_u16(0)
+    def __init__(self, d, p, inv=False):
+        self.dir=Pin(d,Pin.OUT); self.pwm=PWM(Pin(p)); self.pwm.freq(1000); self.inv=inv
+    def fwd(self, sp): self.dir.value(0 ^ self.inv); self.pwm.duty_u16(int(65535*max(0,min(100,int(sp)))/100))
+    def stop(self): self.pwm.duty_u16(0)
 
-    def off(self):
-        self.pwm.duty_u16(0)
+mL = Motor(4,5, INVERT_LEFT)
+mR = Motor(7,6, INVERT_RIGHT)
 
-    def Forward(self, speed):
-        self.mDir.value(0)
-        self.pwm.duty_u16(int(65535 * speed / 100))
+# ----- TUNING -----
+BASE  = 60    # straight speed
+DELTA = 20    # small correction to reach 0110
+HARD  = 40    # strong correction when far
+TURN_OUT = 100 # arc outer wheel speed
+TURN_IN  = 0 # arc inner wheel speed
+DEBOUNCE = 3  # front trigger must persist N cycles
+STABLE   = 1  # need N centered readings to finish a turn
+MAX_TURN_MS = 10
+DT_MS = 20
 
-    def Reverse(self, speed):
-        self.mDir.value(1)
-        self.pwm.duty_u16(int(65535 * speed / 100))
-
-    def Stop(self):
-        self.pwm.duty_u16(0)
-
-# Convenience wrappers (assuming motorL = LEFT, motorR = RIGHT).
-def go_backward(mL, mR, speed):
-    mL.Reverse(speed)
-    mR.Reverse(speed)
-
-def go_forward(mL, mR, speed):
-    mL.Forward(speed)
-    mR.Forward(speed)
-
-def stop_all(mL, mR):
-    mL.Stop()
-    mR.Stop()
-
-def rotate_left(mL, mR, speed):
-    # Left wheel backward, right wheel forward
-    mR.Reverse(speed)
-    mL.Forward(speed)
-
-def rotate_right(mL, mR, speed):
-    # Left wheel forward, right wheel backward
-    mR.Forward(speed)
-    mL.Reverse(speed)
-
-def rotate_left(mL, mR, speed):
-    # Left wheel backward, right wheel forward
-    mR.Reverse(speed)
-    mL.Forward(speed)
-
-def rotate_right(mL, mR, speed):
-    # Left wheel forward, right wheel backward
-    mR.Forward(speed)
-    mL.Reverse(speed)
-
-def pivot_right(mL, mR, speed):
-    # Left wheel stationary, right wheel backward => yaw to the RIGHT
-    mL.Reverse(speed // 7)
-    mR.Reverse(speed)
-
-def pivot_left(mL, mR, speed):
-    # Right wheel stationary, left wheel backward => yaw to the LEFT
-    mR.Reverse(speed // 7)
-    mL.Reverse(speed)
-
-def shift_forward(mL, mR, speed, ms):
-    go_forward(mL, mR, speed)
-    sleep(ms / 1000)
-    stop_all(mL, mR)
-
-def left_check():
-    sleep(CHECK_MS / 1000)
-    while True:
-        if is_line(sensor_bleft.value()):
-            sleep(DELAY_MS / 1000)
-            return True
-        #sleep(CHECK_MS / 1000)
-
-def right_check():
-    while True:
-        if is_line(sensor_bright.value()):
-            sleep(DELAY_MS / 1000)
-            return True
-        #sleep(CHECK_MS / 1000)
-
-def any_check():
-    while True:
-        if is_line(sensor_bleft.value()) or is_line(sensor_fleft.value()) or is_line(sensor_fright.value()):
-            sleep(DELAY_MS / 1000)
-            return True
-        #sleep(CHECK_MS / 1000)
-
-def line_follow(s1, s2, s3, s4):
-    if s2, s3:
-        go_forward(motorL, motorR, SPEED_FWD)
-    elif s2 and not s3:
-        pivot_left(motorL, motorR, SPEED_PIVOT)
-
-    elif not s2 and s3:
-        pivot_right(motorL, motorR, SPEED_PIVOT)
+def read_code():
+    # return 4-bit left->right
+    b3 = 1 if W(S_FL.value()) else 0
+    b2 = 1 if W(S_BL.value()) else 0
+    b1 = 1 if W(S_BR.value()) else 0
+    b0 = 1 if W(S_FR.value()) else 0
+    return (b3<<3)|(b2<<2)|(b1<<1)|b0
 
 
-def test_move():
-    global branch_idx  # <-- routing index
-    motorL = Motor(dirPin=4, PWMPin=5)  # LEFT  motor on GP4/GP5
-    motorR = Motor(dirPin=7, PWMPin=6)  # RIGHT motor on GP6/GP7
+def go(vL, vR): mL.fwd(vL); mR.fwd(vR)
 
-    while True:
-        # Read raw sensor values (0=line, 1=not line)
-        # Convert to booleans: True when on line
-        on_bright  = is_line(sensor_bright.value())
-        on_fleft   = is_line(sensor_fleft.value())
-        on_fright  = is_line(sensor_fright.value())
-        on_bleft   = is_line(sensor_bleft.value())
+def arc(side):
+    global branch_index
+    if side=='R':
+        branch_index += 1
+        go(TURN_IN, TURN_OUT)   # inner slower
         
-        print(f"B:{on_bright} L:{on_fleft} C:{on_bleft} R:{on_fright}")
+    else:     
+        branch_index += 1
+        go(TURN_OUT, TURN_IN)
+        
+    sleep_ms(1200)
 
-        # 2) Side sees line (priority to RIGHT) BUT now gated by the route:
-        #    (a) short forward shift
-        #    (b) turn as prescribed by BRANCH_ROUTE; otherwise ignore (go straight)
-        if (on_fright or on_fleft) and on_bleft and on_bright:
-            #Decide what to do at this branch
-            if branch_idx < len(BRANCH_ROUTE):
-                action = BRANCH_ROUTE[branch_idx]
-                branch_idx += 1  # consume this branch event
+def centered(c):   return c == 0b0110
+def slight_left(c):  return c == 0b0100
+def slight_right(c): return c == 0b0010
 
-            if action == 'S':
-                # ignore this spur, just clear the node
-                shift_forward(motorL, motorR, SPEED_FWD, SHIFT_MS//5)
+def main():
+    global branch_index
+    turning = None
+    fl_cnt = fr_cnt = 0
+    stable = 0
+    t0 = 0
+
+    while True:
+        c = read_code()
+        print("Code:",bin(c))
+        FL = (c>>3)&1;  FR = c&1
+        mid = (c>>1)&0b11  # inner pair
+                # If all four see white: follow the next route directive
+        if c == 0b1111:
+            # if we ran out of directives, default to 'S'
+            action = branch_route[branch_index] if branch_index < len(branch_route) else 'S'
+
+            if action == 'L':
+                turning = 'L'
+                t0 = ticks_ms()
+                arc('L')                 # arc() will consume this route entry
+                sleep_ms(DT_MS)
                 continue
-            elif action == 'R' and on_fright:
-                shift_forward(motorL, motorR, SPEED_FWD, SHIFT_MS)
-                rotate_right(motorL, motorR, SPEED_TURN)
-                center_check()
-                stop_all(motorL, motorR)
+
+            elif action == 'R':
+                turning = 'R'
+                t0 = ticks_ms()
+                arc('R')                 # arc() will consume this route entry
+                sleep_ms(DT_MS)
                 continue
-            elif action == 'L' and on_fleft:
-                shift_forward(motorL, motorR, SPEED_FWD, SHIFT_MS)
-                rotate_left(motorL, motorR, SPEED_TURN)
-                center_check()
-                stop_all(motorL, motorR)
+
+            else:  # 'S' -> skip this node
+                branch_index += 1        # consume the 'S'
+                mL.stop(); mR.stop()
+                sleep_ms(DT_MS)
                 continue
+        
+        if c == 0b1110:
+            # if we ran out of directives, default to 'S'
+            action = branch_route[branch_index] if branch_index < len(branch_route) else 'S'
+
+            if action == 'L':
+                turning = 'L'
+                t0 = ticks_ms()
+                arc('L')                 # arc() will consume this route entry
+                sleep_ms(DT_MS)
+                continue
+
+            elif action == 'R':
+                continue
+
+            else:  # 'S' -> skip this node
+                branch_index += 1        # consume the 'S'
+                mL.stop(); mR.stop()
+                sleep_ms(DT_MS)
+                continue
+        
+        if c == 0b0111:
+            # if we ran out of directives, default to 'S'
+            action = branch_route[branch_index] if branch_index < len(branch_route) else 'S'
+
+            if action == 'L':
+                continue
+
+            elif action == 'R':
+                turning = 'R'
+                t0 = ticks_ms()
+                arc('R')                 # arc() will consume this route entry
+                sleep_ms(DT_MS)
+                continue
+
+            else:  # 'S' -> skip this node
+                branch_index += 1        # consume the 'S'
+                mL.stop(); mR.stop()
+                sleep_ms(DT_MS)
+                continue
+
+        # ---- turn state ----
+        if turning:
+            # finish when re-centered or inner pair suggests followable track again
+            if centered(c) or slight_left(c) or slight_right(c):
+                stable += 1
             else:
-                # Desired turn not available in this instant; ignore and keep moving
-                shift_forward(motorL, motorR, SPEED_FWD, SHIFT_MS//5)
-                continue
-            # if on_fright:
-            #     shift_forward(motorL, motorR, SPEED_FWD, SHIFT_MS)
-            #     rotate_right(motorL, motorR, SPEED_TURN)
-            #     center_check()
-            #     stop_all(motorL, motorR)
-            #     continue
-            # elif on_fleft:
-            #     shift_forward(motorL, motorR, SPEED_FWD, SHIFT_MS)
-            #     rotate_left(motorL, motorR, SPEED_TURN)
-            #     center_check()
-            #     stop_all(motorL, motorR)
-            #     continue
+                stable = 0
+            if stable >= STABLE or ticks_diff(ticks_ms(), t0) > MAX_TURN_MS:
+                turning = None; stable = 0; go(BASE, BASE); sleep_ms(DT_MS); continue
+            arc(turning); sleep_ms(DT_MS); continue
 
-        # 3) If center LOST the line but a side sensor has it:
-        #    corners (outer loop) handled as before
-        if not on_bleft and (on_fright or on_fleft) and on_bright:
-            if on_fright:
-                rotate_right(motorL, motorR, SPEED_TURN)
-                center_check()
-                stop_all(motorL, motorR)
-            else:  # on_fleft
-                rotate_left(motorL, motorR, SPEED_TURN)
-                center_check()
-                stop_all(motorL, motorR)
-            #sleep(CHECK_MS / 1000)
-            continue
-
-if __name__ == "__main__":
-    test_move()
+        # ---- detect a branch (outer sensor on one side, inner pair mostly white) ----
+        # if FL and not FR and mid == 0b11:
+        #     fl_cnt += 1; fr_cnt = 0
+        #     if fl_cnt >= DEBOUNCE:
+        #         turning = 'L'; t0 = ticks_ms(); arc('L'); sleep_ms(DT_MS); continue
+        # elif FR and not FL and mid == 0b11:
+        #     fr_cnt += 1; fl_cnt = 0
+        #     if fr_cnt >= DEBOUNCE:
+        #         turning = 'R'; t0 = ticks_ms(); arc('R'); sleep_ms(DT_MS); continue
+        # else:
+        #     fl_cnt = fr_cnt = 0
 
 
+# ---- follower toward 0110 (no turn) ----
+        if centered(c):
+            go(BASE, BASE)
+        elif c == 0b0100:           # left inner only -> steer LEFT
+            go(BASE-DELTA, BASE+DELTA)
+        elif c == 0b0010:           # right inner only -> steer RIGHT
+            go(BASE+DELTA, BASE-DELTA)
+        elif c in (0b1100, 0b1000): # far to left
+            go(BASE-HARD, BASE+HARD)
+        elif c in (0b0011, 0b0001): # far to right
+            go(BASE+HARD, BASE-HARD)
+        else:
+            # unknown/lost -> gentle bias to move forward
+            go(BASE, BASE-10)
+
+        sleep_ms(DT_MS)
+
+main()

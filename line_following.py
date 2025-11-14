@@ -10,6 +10,8 @@ S_FR = Pin(19, Pin.IN)   # front-right (outer)
 WHITE_LEVEL = 1
 def W(x): return x == WHITE_LEVEL
 
+branch_route = ['R','L']  # sequence of turns at branches
+branch_index = 0
 
 # ----- MOTORS -----
 INVERT_LEFT  = False     # flip these until forward() drives robot forward
@@ -47,8 +49,15 @@ def read_code():
 def go(vL, vR): mL.fwd(vL); mR.fwd(vR)
 
 def arc(side):
-    if side=='R':  go(TURN_IN, TURN_OUT)   # inner slower
-    else:          go(TURN_OUT, TURN_IN)
+    global branch_index
+    if side=='R':
+        branch_index += 1
+        go(TURN_IN, TURN_OUT)   # inner slower
+        
+    else:     
+        branch_index += 1
+        go(TURN_OUT, TURN_IN)
+        
     sleep_ms(1200)
 
 def centered(c):   return c == 0b0110
@@ -56,6 +65,7 @@ def slight_left(c):  return c == 0b0100
 def slight_right(c): return c == 0b0010
 
 def main():
+    global branch_index
     turning = None
     fl_cnt = fr_cnt = 0
     stable = 0
@@ -66,6 +76,70 @@ def main():
         print("Code:",bin(c))
         FL = (c>>3)&1;  FR = c&1
         mid = (c>>1)&0b11  # inner pair
+                # If all four see white: follow the next route directive
+        if c == 0b1111:
+            # if we ran out of directives, default to 'S'
+            action = branch_route[branch_index] if branch_index < len(branch_route) else 'S'
+
+            if action == 'L':
+                turning = 'L'
+                t0 = ticks_ms()
+                arc('L')                 # arc() will consume this route entry
+                sleep_ms(DT_MS)
+                continue
+
+            elif action == 'R':
+                turning = 'R'
+                t0 = ticks_ms()
+                arc('R')                 # arc() will consume this route entry
+                sleep_ms(DT_MS)
+                continue
+
+            else:  # 'S' -> skip this node
+                branch_index += 1        # consume the 'S'
+                mL.stop(); mR.stop()
+                sleep_ms(DT_MS)
+                continue
+        
+        if c == 0b1110:
+            # if we ran out of directives, default to 'S'
+            action = branch_route[branch_index] if branch_index < len(branch_route) else 'S'
+
+            if action == 'L':
+                turning = 'L'
+                t0 = ticks_ms()
+                arc('L')                 # arc() will consume this route entry
+                sleep_ms(DT_MS)
+                continue
+
+            elif action == 'R':
+                continue
+
+            else:  # 'S' -> skip this node
+                branch_index += 1        # consume the 'S'
+                mL.stop(); mR.stop()
+                sleep_ms(DT_MS)
+                continue
+        
+        if c == 0b0111:
+            # if we ran out of directives, default to 'S'
+            action = branch_route[branch_index] if branch_index < len(branch_route) else 'S'
+
+            if action == 'L':
+                continue
+
+            elif action == 'R':
+                turning = 'R'
+                t0 = ticks_ms()
+                arc('R')                 # arc() will consume this route entry
+                sleep_ms(DT_MS)
+                continue
+
+            else:  # 'S' -> skip this node
+                branch_index += 1        # consume the 'S'
+                mL.stop(); mR.stop()
+                sleep_ms(DT_MS)
+                continue
 
         # ---- turn state ----
         if turning:
@@ -79,18 +153,19 @@ def main():
             arc(turning); sleep_ms(DT_MS); continue
 
         # ---- detect a branch (outer sensor on one side, inner pair mostly white) ----
-        if FL and not FR and mid == 0b11:
-            fl_cnt += 1; fr_cnt = 0
-            if fl_cnt >= DEBOUNCE:
-                turning = 'L'; t0 = ticks_ms(); arc('L'); sleep_ms(DT_MS); continue
-        elif FR and not FL and mid == 0b11:
-            fr_cnt += 1; fl_cnt = 0
-            if fr_cnt >= DEBOUNCE:
-                turning = 'R'; t0 = ticks_ms(); arc('R'); sleep_ms(DT_MS); continue
-        else:
-            fl_cnt = fr_cnt = 0
+        # if FL and not FR and mid == 0b11:
+        #     fl_cnt += 1; fr_cnt = 0
+        #     if fl_cnt >= DEBOUNCE:
+        #         turning = 'L'; t0 = ticks_ms(); arc('L'); sleep_ms(DT_MS); continue
+        # elif FR and not FL and mid == 0b11:
+        #     fr_cnt += 1; fl_cnt = 0
+        #     if fr_cnt >= DEBOUNCE:
+        #         turning = 'R'; t0 = ticks_ms(); arc('R'); sleep_ms(DT_MS); continue
+        # else:
+        #     fl_cnt = fr_cnt = 0
 
-        # ---- follower toward 0110 (no turn) ----
+
+# ---- follower toward 0110 (no turn) ----
         if centered(c):
             go(BASE, BASE)
         elif c == 0b0100:           # left inner only -> steer LEFT
