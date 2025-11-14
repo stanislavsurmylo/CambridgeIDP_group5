@@ -15,7 +15,7 @@ sR = Pin(SENSOR_PIN_RIGHT, Pin.IN)   # right-back
 
 # === TUNING ===
 WHITE_LEVEL   = 1        # set to 0 if your module outputs 0 on white
-BASE_SPEED    = 35       # forward cruise speed [%]
+BASE_SPEED    = 50       # forward cruise speed [%]
 GAIN          = 25       # differential correction added/subtracted to motors
 CHECK_MS      = 20       # loop period
 
