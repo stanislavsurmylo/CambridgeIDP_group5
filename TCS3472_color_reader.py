@@ -14,13 +14,12 @@ def setup_sensor():
     try:
         from libs.tcs3472 import tcs3472
     except ImportError as e:
-        raise RuntimeError("Missing driver") from e
+        raise RuntimeError ("TCS3472 driver not found") from e
     return tcs3472(i2c_bus)
 
 
 def main():
     sensor = setup_sensor()
-    print("TCS3472 color sensor reader (every 1s). Ctrl+C to stop.")
 
     while True:
         try:           
@@ -32,8 +31,8 @@ def main():
         except KeyboardInterrupt:
             print("\nStopping TCS3472 reader.")
             break
-        except Exception as exc:
-            print("Sensor error:", exc)
+        except Exception as e:
+            print("Sensor error:", e)
             sleep(1.0)
 
 
