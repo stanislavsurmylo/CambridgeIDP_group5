@@ -1,17 +1,17 @@
 from machine import Pin, PWM
 from time import sleep
 
-SENSOR_PIN_BACK   = 21  # GP21 (pin 27)
-SENSOR_PIN_LEFT   = 20  # GP20 (pin 26)
-SENSOR_PIN_RIGHT  = 19  # GP19 (pin 25)
-SENSOR_PIN_CENTER = 18  # GP18 (pin 24)
+SENSOR_PIN_BRIGHT   = 21  # GP21 (pin 27)
+SENSOR_PIN_FLEFT   = 20  # GP20 (pin 26)
+SENSOR_PIN_FRIGHT  = 19  # GP19 (pin 25)
+SENSOR_PIN_BLEFT = 18  # GP18 (pin 24)
 
 led = Pin("LED", Pin.OUT)  # on-board LED
 
-sensor_back   = Pin(SENSOR_PIN_BACK,   Pin.IN)
-sensor_left   = Pin(SENSOR_PIN_LEFT,   Pin.IN)
-sensor_right  = Pin(SENSOR_PIN_RIGHT,  Pin.IN)
-sensor_center = Pin(SENSOR_PIN_CENTER, Pin.IN)
+sensor_bright   = Pin(SENSOR_PIN_BRIGHT,   Pin.IN)
+sensor_fleft   = Pin(SENSOR_PIN_FLEFT,   Pin.IN)
+sensor_fright  = Pin(SENSOR_PIN_FRIGHT,  Pin.IN)
+sensor_bleft = Pin(SENSOR_PIN_BLEFT, Pin.IN)
 
 
 SPEED_FWD      = 100   # % for forward cruising
@@ -86,6 +86,16 @@ def rotate_right(mL, mR, speed):
     mR.Forward(speed)
     mL.Reverse(speed)
 
+def rotate_left(mL, mR, speed):
+    # Left wheel backward, right wheel forward
+    mR.Reverse(speed)
+    mL.Forward(speed)
+
+def rotate_right(mL, mR, speed):
+    # Left wheel forward, right wheel backward
+    mR.Forward(speed)
+    mL.Reverse(speed)
+
 def pivot_right(mL, mR, speed):
     # Left wheel stationary, right wheel backward => yaw to the RIGHT
     mL.Reverse(speed // 7)
@@ -101,27 +111,37 @@ def shift_forward(mL, mR, speed, ms):
     sleep(ms / 1000)
     stop_all(mL, mR)
 
-def center_check():
+def left_check():
     sleep(CHECK_MS / 1000)
     while True:
-        if is_line(sensor_center.value()):
+        if is_line(sensor_bleft.value()):
             sleep(DELAY_MS / 1000)
             return True
         #sleep(CHECK_MS / 1000)
 
-def back_check():
+def right_check():
     while True:
-        if is_line(sensor_back.value()):
+        if is_line(sensor_bright.value()):
             sleep(DELAY_MS / 1000)
             return True
         #sleep(CHECK_MS / 1000)
 
 def any_check():
     while True:
-        if is_line(sensor_center.value()) or is_line(sensor_left.value()) or is_line(sensor_right.value()):
+        if is_line(sensor_bleft.value()) or is_line(sensor_fleft.value()) or is_line(sensor_fright.value()):
             sleep(DELAY_MS / 1000)
             return True
         #sleep(CHECK_MS / 1000)
+
+def line_follow(s1, s2, s3, s4):
+    if s2, s3:
+        go_forward(motorL, motorR, SPEED_FWD)
+    elif s2 and not s3:
+        pivot_left(motorL, motorR, SPEED_PIVOT)
+
+    elif not s2 and s3:
+        pivot_right(motorL, motorR, SPEED_PIVOT)
+
 
 def test_move():
     global branch_idx  # <-- routing index
@@ -130,46 +150,18 @@ def test_move():
 
     while True:
         # Read raw sensor values (0=line, 1=not line)
-        raw_b = sensor_back.value()
-        raw_l = sensor_left.value()
-        raw_r = sensor_right.value()
-        raw_c = sensor_center.value()
-
         # Convert to booleans: True when on line
-        on_back   = is_line(raw_b)
-        on_left   = is_line(raw_l)
-        on_right  = is_line(raw_r)
-        on_center = is_line(raw_c)
+        on_bright  = is_line(sensor_bright.value())
+        on_fleft   = is_line(sensor_fleft.value())
+        on_fright  = is_line(sensor_fright.value())
+        on_bleft   = is_line(sensor_bleft.value())
         
-        print(f"B:{on_back} L:{on_left} C:{on_center} R:{on_right}")
-
-        # --- Core behaviour ---
-        # 0) If BACK sensor lost the line, go backward until it finds it
-        if not on_back:
-            go_backward(motorL, motorR, SPEED_BACK)
-            back_check()
-            stop_all(motorL, motorR)
-
-            #sleep(CHECK_MS / 1000)
-            continue
-
-        # 1) Center & back both see the line ⇒ go straight
-        if on_back and on_center and not on_left and not on_right:
-            go_forward(motorL, motorR, SPEED_FWD)
-            #sleep(CHECK_MS / 1000)
-            continue
-
-        # 1b) Back sees line but center does NOT ⇒ recover to additional sensor by turning right
-        if on_back and not on_center and not on_right and not on_left:
-            rotate_right(motorL, motorR, SPEED_TURN)
-            any_check()
-            stop_all(motorL, motorR)
-            continue
+        print(f"B:{on_bright} L:{on_fleft} C:{on_bleft} R:{on_fright}")
 
         # 2) Side sees line (priority to RIGHT) BUT now gated by the route:
         #    (a) short forward shift
         #    (b) turn as prescribed by BRANCH_ROUTE; otherwise ignore (go straight)
-        if (on_right or on_left) and on_center and on_back:
+        if (on_fright or on_fleft) and on_bleft and on_bright:
             #Decide what to do at this branch
             if branch_idx < len(BRANCH_ROUTE):
                 action = BRANCH_ROUTE[branch_idx]
@@ -179,13 +171,13 @@ def test_move():
                 # ignore this spur, just clear the node
                 shift_forward(motorL, motorR, SPEED_FWD, SHIFT_MS//5)
                 continue
-            elif action == 'R' and on_right:
+            elif action == 'R' and on_fright:
                 shift_forward(motorL, motorR, SPEED_FWD, SHIFT_MS)
                 rotate_right(motorL, motorR, SPEED_TURN)
                 center_check()
                 stop_all(motorL, motorR)
                 continue
-            elif action == 'L' and on_left:
+            elif action == 'L' and on_fleft:
                 shift_forward(motorL, motorR, SPEED_FWD, SHIFT_MS)
                 rotate_left(motorL, motorR, SPEED_TURN)
                 center_check()
@@ -195,13 +187,13 @@ def test_move():
                 # Desired turn not available in this instant; ignore and keep moving
                 shift_forward(motorL, motorR, SPEED_FWD, SHIFT_MS//5)
                 continue
-            # if on_right:
+            # if on_fright:
             #     shift_forward(motorL, motorR, SPEED_FWD, SHIFT_MS)
             #     rotate_right(motorL, motorR, SPEED_TURN)
             #     center_check()
             #     stop_all(motorL, motorR)
             #     continue
-            # elif on_left:
+            # elif on_fleft:
             #     shift_forward(motorL, motorR, SPEED_FWD, SHIFT_MS)
             #     rotate_left(motorL, motorR, SPEED_TURN)
             #     center_check()
@@ -210,12 +202,12 @@ def test_move():
 
         # 3) If center LOST the line but a side sensor has it:
         #    corners (outer loop) handled as before
-        if not on_center and (on_right or on_left) and on_back:
-            if on_right:
+        if not on_bleft and (on_fright or on_fleft) and on_bright:
+            if on_fright:
                 rotate_right(motorL, motorR, SPEED_TURN)
                 center_check()
                 stop_all(motorL, motorR)
-            else:  # on_left
+            else:  # on_fleft
                 rotate_left(motorL, motorR, SPEED_TURN)
                 center_check()
                 stop_all(motorL, motorR)
