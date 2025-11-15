@@ -10,7 +10,7 @@ S_FR = Pin(19, Pin.IN)   # front-right (outer)
 WHITE_LEVEL = 1
 def W(x): return x == WHITE_LEVEL
 
-branch_route = ['R','L','L','L','L','R']  # sequence of turns at branches
+branch_route = ['S','R','R','R','L']  # sequence of turns at branches
 branch_index = 0
 
 # ----- MOTORS -----
@@ -37,6 +37,16 @@ STABLE   = 1  # need N centered readings to finish a turn
 MAX_TURN_MS = 10
 DT_MS = 20
 
+
+RADIUS_OF_TURN = 16.5  # radius of turn in cm
+
+    # Radius of turn = 16.5 cm
+    # Angle is 90 degrees
+    # turn distance is (π * 16.5) / 2 = 25.9 cm
+    # Speed is 15 cm/s at power 60
+    #  At power 100, speed is 25 cm/s
+    # Time to turn 25.9 cm at 25 cm/s = 1.036 s
+
 def read_code():
     # return 4-bit left->right
     b3 = 1 if W(S_FL.value()) else 0
@@ -50,15 +60,49 @@ def go(vL, vR): mL.fwd(vL); mR.fwd(vR)
 
 def arc(side):
     global branch_index
+
     if side=='R':
+        DEGREE_OF_TURN = 90
         branch_index += 1
         go(TURN_IN, TURN_OUT)   # inner slower
-        
-    else:     
+        turn_sleep(DEGREE_OF_TURN, (TURN_OUT - TURN_IN))
+        print('R')
+
+    elif side=='L':
+        DEGREE_OF_TURN = 90     
         branch_index += 1
         go(TURN_OUT, TURN_IN)
-        
-    sleep_ms(1200)
+        turn_sleep(DEGREE_OF_TURN, (TURN_OUT - TURN_IN))
+        print('L')
+    
+    elif side == 'B': 
+        DEGREE_OF_TURN = 180
+        branch_index += 1
+        go(TURN_IN, TURN_OUT)
+        turn_sleep(DEGREE_OF_TURN, (TURN_OUT - TURN_IN))
+        print('B')
+
+    elif side == 'S':
+        branch_index += 1        # consume the 'S'
+        go(100,100)
+        sleep_ms(200)  # move forward length of line
+        print('S')
+
+
+    else:
+        branch_index += 1        # consume the 'S'
+        mL.stop(); mR.stop()
+        sleep_ms(DT_MS)
+        print('X(S)')
+
+
+
+
+def turn_sleep(deg, speed):
+    distance = (deg / 180) * 3.14 * RADIUS_OF_TURN  # distance to travel
+    time_ms = (distance / (speed * 0.25)) * 1000  # time in ms
+    sleep_ms(int(time_ms))
+
 
 def centered(c):   return c == 0b0110
 def slight_left(c):  return c == 0b0100
@@ -73,13 +117,13 @@ def main():
 
     while True:
         c = read_code()
-        print("Code:",bin(c))
+        # print("Code:",bin(c))
         FL = (c>>3)&1;  FR = c&1
         mid = (c>>1)&0b11  # inner pair
                 # If all four see white: follow the next route directive
         if c == 0b1111:
             # if we ran out of directives, default to 'S'
-            action = branch_route[branch_index] if branch_index < len(branch_route) else 'S'
+            action = branch_route[branch_index] if branch_index < len(branch_route) else 'X'
 
             if action == 'L':
                 turning = 'L'
@@ -95,9 +139,17 @@ def main():
                 sleep_ms(DT_MS)
                 continue
 
+            elif action == 'B':
+                turning = 'B'
+                t0 = ticks_ms()
+                arc('B')                 # arc() will consume this route entry
+                sleep_ms(DT_MS)
+                continue
+
             else:  # 'S' -> skip this node
-                branch_index += 1        # consume the 'S'
-                mL.stop(); mR.stop()
+                turning = 'S'
+                t0 = ticks_ms()
+                arc('S')                 # arc() will consume this route entry
                 sleep_ms(DT_MS)
                 continue
         
@@ -142,6 +194,7 @@ def main():
                 continue
 
         # ---- turn state ----
+
         if turning:
             # finish when re-centered or inner pair suggests followable track again
             if centered(c) or slight_left(c) or slight_right(c):
