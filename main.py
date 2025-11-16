@@ -10,7 +10,7 @@ S_FR = Pin(19, Pin.IN)   # front-right (outer)
 WHITE_LEVEL = 1
 def W(x): return x == WHITE_LEVEL
 
-branch_route = ['S','R','R','R','L']  # sequence of turns at branches
+branch_route = ['R','L','S','S','S','S','S','S','S','L','S','L','S','S','S','S','S','S','S','L','S','R']  # sequence of turns at branches
 branch_index = 0
 
 # ----- MOTORS -----
