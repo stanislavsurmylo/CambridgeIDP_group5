@@ -115,6 +115,9 @@ def main():
     stable = 0
     t0 = 0
 
+    go(BASE, BASE)
+    sleep_ms(2000)  # initial settle
+
     while True:
         c = read_code()
         # print("Code:",bin(c))
@@ -168,8 +171,9 @@ def main():
                 continue
 
             else:  # 'S' -> skip this node
-                branch_index += 1        # consume the 'S'
-                mL.stop(); mR.stop()
+                turning = 'S'
+                t0 = ticks_ms()
+                arc('S')                 # arc() will consume this route entry
                 sleep_ms(DT_MS)
                 continue
         
@@ -188,8 +192,9 @@ def main():
                 continue
 
             else:  # 'S' -> skip this node
-                branch_index += 1        # consume the 'S'
-                mL.stop(); mR.stop()
+                turning = 'S'
+                t0 = ticks_ms()
+                arc('S')                 # arc() will consume this route entry
                 sleep_ms(DT_MS)
                 continue
 
@@ -234,5 +239,6 @@ def main():
             go(BASE, BASE-10)
 
         sleep_ms(DT_MS)
+        
 
 main()
