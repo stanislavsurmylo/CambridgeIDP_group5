@@ -13,7 +13,7 @@ def W(x): return x == WHITE_LEVEL
 branch_route = ['R','L','S','S','S','S','S','S','S','L','S','L','S','S','S','S','S','S','S','L','S','R']  # sequence of turns at branches
 branch_index = 0
 
-spend_S = True
+spend_S = True # branch index advances once when 'S' is executed viewing one turn
 
 # ----- MOTORS -----
 INVERT_LEFT  = False     # flip these until forward() drives robot forward
