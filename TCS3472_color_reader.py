@@ -1,11 +1,12 @@
-from machine import I2C, Pin
+from machine import I2C, Pin, UART
 from utime import sleep
 
 
 I2C_ID = 0
-PIN_SDA = 8   
-PIN_SCL = 9   
-BUTTON_PIN = 16  
+PIN_SDA = 8   # GP8 (SDA)
+PIN_SCL = 9   # GP9 (SCL)
+UART_ID = 0   # UART0 for start/stop commands
+UART_BAUD = 115200
 SAMPLE_INTERVAL_SECONDS = 0.5
 
 
@@ -19,9 +20,7 @@ def setup_sensor():
     return tcs3472(i2c_bus)
 
 def detect_color(rgb, light):
-    """Return a basic color name based on RGB proportions."""
     r, g, b = rgb
-
     if light < 50 or (r == 0 and g == 0 and b == 0):
         return "DARK"
     total = r + g + b
@@ -30,12 +29,10 @@ def detect_color(rgb, light):
     b_ratio = b / total
 
     if r_ratio > 0.33 and r > 100:
-        if g_ratio > 0.3:
-            return "YELLOW"  
         return "RED"
     if g_ratio > 0.33 and g > 80:
         return "GREEN"
-    if b_ratio > 0.45 and b > 100:
+    if b_ratio > 0.33 and b > 100:
         return "BLUE"
     if r_ratio > 0.33 and g_ratio > 0.33:
         return "YELLOW"
@@ -43,12 +40,23 @@ def detect_color(rgb, light):
 
 def main():
     sensor = setup_sensor()
-    button = Pin(BUTTON_PIN, Pin.IN, Pin.PULL_UP)
+    uart = UART(UART_ID, baudrate=UART_BAUD)
+    sensor_enabled = False
+
+    print("TCS3472 color reader ready.")
+    print("Send '1' over UART0 to START, '0' to STOP.")
 
     while True:
         try:
-            pressed = (button.value() == 0)
-            if pressed:
+            if uart.any():
+                cmd = uart.read(1)
+                if cmd == b'1':
+                    sensor_enabled = True
+                    print("Color sensor ENABLED")
+                elif cmd == b'0':
+                    sensor_enabled = False
+                    print("Color sensor DISABLED")
+            if sensor_enabled:
                 light = sensor.light()
                 rgb = sensor.rgb()
                 color = detect_color(rgb, light)
@@ -56,7 +64,7 @@ def main():
                 print("RGB:", rgb)
                 print("Color:", color)
             else:
-                print("Button OFF")
+                print("Sensor OFF (waiting for UART command '1')")
             sleep(SAMPLE_INTERVAL_SECONDS)
         except KeyboardInterrupt:
             print("\nStopping TCS3472 reader.")
