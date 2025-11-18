@@ -10,13 +10,11 @@ VREF_VOLTS = 3.3         # Pico reference voltage
 # Calibration: distance (cm) = voltage (V) * CM_PER_VOLT
 CM_PER_VOLT = 100.0
 
-
 def URM09_read_distance(distance_adc: ADC) -> float:
     raw = distance_adc.read_u16()
     voltage = (raw / ADC_MAX_READING) * VREF_VOLTS
     distance_cm = voltage * CM_PER_VOLT
     return distance_cm
-
 
 def main():
     distance_adc = ADC(Pin(ADC_PIN_NUMBER))
