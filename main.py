@@ -3,16 +3,15 @@ from machine import Pin, PWM
 from time import sleep_ms, ticks_ms, ticks_diff
 
 # ----- SENSORS (left->right). Swap sFL,sFR wires here if needed -----
-S_FL = Pin(20, Pin.IN)   # front-left  (outer)
+S_FL = Pin(19, Pin.IN)   # front-left  (outer)
 S_BL = Pin(21, Pin.IN)   # back-left   (inner)
 S_BR = Pin(18, Pin.IN)   # back-right  (inner)
-S_FR = Pin(19, Pin.IN)   # front-right (outer)
+S_FR = Pin(20, Pin.IN)   # front-right (outer)
 WHITE_LEVEL = 1
 def W(x): return x == WHITE_LEVEL
 
-branch_route = ['B']  # sequence of turns at branches
+branch_route = ['R','L','S','S','S','S','S','S','S','L','S','L','S','S','S','S','S','S','S','L','S','R']  # sequence of turns at branches
 branch_index = 0
-spend_S = True
 
 # ----- MOTORS -----
 INVERT_LEFT  = False     # flip these until forward() drives robot forward
@@ -22,7 +21,6 @@ class Motor:
     def __init__(self, d, p, inv=False):
         self.dir=Pin(d,Pin.OUT); self.pwm=PWM(Pin(p)); self.pwm.freq(1000); self.inv=inv
     def fwd(self, sp): self.dir.value(0 ^ self.inv); self.pwm.duty_u16(int(65535*max(0,min(100,int(sp)))/100))
-    def bwd(self, sp): self.dir.value(1 ^ self.inv); self.pwm.duty_u16(int(65535*max(0,min(100,int(sp)))/100))
     def stop(self): self.pwm.duty_u16(0)
 
 mL = Motor(4,5, INVERT_LEFT)
@@ -59,9 +57,6 @@ def read_code():
 
 
 def go(vL, vR): mL.fwd(vL); mR.fwd(vR)
-def spin_right(vL, vR): mL.fwd(vL); mR.bwd(vR)
-def spin_left(vL, vR): mL.bwd(vL); mR.fwd(vR)
-
 
 def arc(side):
     global branch_index
@@ -83,16 +78,14 @@ def arc(side):
     elif side == 'B': 
         DEGREE_OF_TURN = 180
         branch_index += 1
-        spin_left(TURN_OUT, TURN_OUT)
+        go(TURN_IN, TURN_OUT)
         turn_sleep(DEGREE_OF_TURN, (TURN_OUT - TURN_IN))
         print('B')
 
     elif side == 'S':
-        if spend_S:    
-            branch_index += 1        # consume the 'S'
-            spend_S = False
-        #go(100,100)
-        #sleep_ms(200)  # move forward length of line
+        branch_index += 1        # consume the 'S'
+        go(100,100)
+        sleep_ms(200)  # move forward length of line
         print('S')
 
 
@@ -121,7 +114,7 @@ def main():
     fl_cnt = fr_cnt = 0
     stable = 0
     t0 = 0
-    sleep_ms(5000)
+    sleep_ms(5000)  # wait for things to settle
     go(BASE, BASE)
     sleep_ms(2000)  # initial settle
 
@@ -131,20 +124,9 @@ def main():
         FL = (c>>3)&1;  FR = c&1
         mid = (c>>1)&0b11  # inner pair
                 # If all four see white: follow the next route directive
-
-        if c in [0b0000, 0b0100, 0b0010, 0b0110]:
-           spend_S = True
-
         if c == 0b1111:
             # if we ran out of directives, default to 'S'
             action = branch_route[branch_index] if branch_index < len(branch_route) else 'X'
-            if branch_index >= len(branch_route):
-                go(100, 100)
-                sleep_ms(500)
-                mL.stop()
-                mR.stop()
-                print("End of route")
-                break
 
             if action == 'L':
                 turning = 'L'
@@ -188,13 +170,6 @@ def main():
             elif action == 'R':
                 continue
 
-            elif action == 'B':
-                turning = 'B'
-                t0 = ticks_ms()
-                arc('B')                 # arc() will consume this route entry
-                sleep_ms(DT_MS)
-                continue
-
             else:  # 'S' -> skip this node
                 turning = 'S'
                 t0 = ticks_ms()
@@ -213,13 +188,6 @@ def main():
                 turning = 'R'
                 t0 = ticks_ms()
                 arc('R')                 # arc() will consume this route entry
-                sleep_ms(DT_MS)
-                continue
-
-            elif action == 'B':
-                turning = 'B'
-                t0 = ticks_ms()
-                arc('B')                 # arc() will consume this route entry
                 sleep_ms(DT_MS)
                 continue
 
@@ -266,13 +234,10 @@ def main():
             go(BASE-HARD, BASE+HARD)
         elif c in (0b0011, 0b0001): # far to right
             go(BASE+HARD, BASE-HARD)
-        elif c == 0b0000:
-            # unknown/lost -> gentle bias to move forward
-            go(BASE, BASE)
         else:
-            go(0,0)
-        
-        
+            # unknown/lost -> gentle bias to move forward
+            go(BASE, BASE-10)
+
         sleep_ms(DT_MS)
         
 
