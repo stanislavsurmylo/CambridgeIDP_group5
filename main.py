@@ -10,7 +10,7 @@ S_FR = Pin(20, Pin.IN)   # front-right (outer)
 WHITE_LEVEL = 1
 def W(x): return x == WHITE_LEVEL
 
-branch_route = ['R','L','S','S','S','S','S','S','S','L','S','L','S','S','S','S','S','S','S','L','S','R']  # sequence of turns at branches
+branch_route = ['R','L','R']  # sequence of turns at branches
 branch_index = 0
 
 # ----- MOTORS -----
@@ -27,7 +27,7 @@ mL = Motor(4,5, INVERT_LEFT)
 mR = Motor(7,6, INVERT_RIGHT)
 
 # ----- TUNING -----
-BASE  = 60    # straight speed
+BASE  = 80    # straight speed
 DELTA = 20    # small correction to reach 0110
 HARD  = 40    # strong correction when far
 TURN_OUT = 100 # arc outer wheel speed
@@ -64,14 +64,14 @@ def arc(side):
     if side=='R':
         DEGREE_OF_TURN = 90
         branch_index += 1
-        go(TURN_IN, TURN_OUT)   # inner slower
+        go(TURN_OUT, TURN_IN)   # inner slower
         turn_sleep(DEGREE_OF_TURN, (TURN_OUT - TURN_IN))
         print('R')
 
     elif side=='L':
         DEGREE_OF_TURN = 90     
         branch_index += 1
-        go(TURN_OUT, TURN_IN)
+        go(TURN_IN, TURN_OUT)
         turn_sleep(DEGREE_OF_TURN, (TURN_OUT - TURN_IN))
         print('L')
     
@@ -114,13 +114,14 @@ def main():
     fl_cnt = fr_cnt = 0
     stable = 0
     t0 = 0
-    sleep_ms(5000)  # wait for things to settle
-    go(BASE, BASE)
-    sleep_ms(2000)  # initial settle
+    # sleep_ms(5000)  # wait for things to settle
+    # go(BASE, BASE)
+    # sleep_ms(2000)  # initial settle
+
 
     while True:
         c = read_code()
-        # print("Code:",bin(c))
+        print("Code:",bin(c))
         FL = (c>>3)&1;  FR = c&1
         mid = (c>>1)&0b11  # inner pair
                 # If all four see white: follow the next route directive
