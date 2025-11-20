@@ -89,88 +89,90 @@ class DirectedEdge(NamedTuple):
     cost: float
 
 
+# ------------ directed edges ------------
+
 
 DIRECTED_EDGES = [
 
-    DirectedEdge(src=V.DOWN_LEFT  , dst=V.DOWN_RIGHT , start_heading=1, turn=None, end_heading=1, cost=8.0),
-    DirectedEdge(src=V.DOWN_LEFT  , dst=V.RAMP       , start_heading=1, turn=None, end_heading=2, cost=8.0),
-    DirectedEdge(src=V.DOWN_LEFT  , dst=V.A_DOWN_BEG , start_heading=3, turn=None, end_heading=2, cost=6.0),
+    DirectedEdge(src=V.DOWN_LEFT  , dst=V.DOWN_RIGHT , start_heading=1, turn='F', end_heading=1, cost=8.0),
+    DirectedEdge(src=V.DOWN_LEFT  , dst=V.RAMP       , start_heading=1, turn='R', end_heading=2, cost=8.0),
+    DirectedEdge(src=V.DOWN_LEFT  , dst=V.A_DOWN_BEG , start_heading=3, turn='L', end_heading=2, cost=6.0),
 
-    DirectedEdge(src=V.A_DOWN_BEG , dst=V.DOWN_LEFT  , start_heading=0, turn=None, end_heading=1, cost=6.0),
-    DirectedEdge(src=V.A_DOWN_BEG , dst=V.A_DOWN_END , start_heading=2, turn=None, end_heading=2, cost=6.0),
+    DirectedEdge(src=V.A_DOWN_BEG , dst=V.DOWN_LEFT  , start_heading=0, turn='R', end_heading=1, cost=6.0),
+    DirectedEdge(src=V.A_DOWN_BEG , dst=V.A_DOWN_END , start_heading=2, turn='F', end_heading=2, cost=6.0),
 
-    DirectedEdge(src=V.A_DOWN_END , dst=V.A_DOWN_BEG , start_heading=0, turn=None, end_heading=0, cost=6.0),
-    DirectedEdge(src=V.A_DOWN_END , dst=V.BLUE       , start_heading=2, turn=None, end_heading=2, cost=6.0),
-    DirectedEdge(src=V.A_DOWN_END , dst=V.LEFT       , start_heading=2, turn=None, end_heading=1, cost=5.0),
+    DirectedEdge(src=V.A_DOWN_END , dst=V.A_DOWN_BEG , start_heading=0, turn='F', end_heading=0, cost=6.0),
+    DirectedEdge(src=V.A_DOWN_END , dst=V.BLUE       , start_heading=2, turn='F', end_heading=2, cost=6.0),
+    DirectedEdge(src=V.A_DOWN_END , dst=V.LEFT       , start_heading=2, turn='L', end_heading=1, cost=5.0),
 
-    DirectedEdge(src=V.BLUE       , dst=V.A_DOWN_END , start_heading=0, turn=None, end_heading=0, cost=6.0),
-    DirectedEdge(src=V.BLUE       , dst=V.LEFT       , start_heading=0, turn=None, end_heading=1, cost=3.0),
+    DirectedEdge(src=V.BLUE       , dst=V.A_DOWN_END , start_heading=0, turn='F', end_heading=0, cost=6.0),
+    DirectedEdge(src=V.BLUE       , dst=V.LEFT       , start_heading=0, turn='R', end_heading=1, cost=3.0),
 
-    DirectedEdge(src=V.LEFT       , dst=V.A_DOWN_END , start_heading=3, turn=None, end_heading=0, cost=5.0),
-    DirectedEdge(src=V.LEFT       , dst=V.BLUE       , start_heading=3, turn=None, end_heading=2, cost=3.0),
-    DirectedEdge(src=V.LEFT       , dst=V.GREEN      , start_heading=1, turn=None, end_heading=2, cost=3.0),
-    DirectedEdge(src=V.LEFT       , dst=V.START_LEFT , start_heading=1, turn=None, end_heading=1, cost=3.0),
+    DirectedEdge(src=V.LEFT       , dst=V.A_DOWN_END , start_heading=3, turn='R', end_heading=0, cost=5.0),
+    DirectedEdge(src=V.LEFT       , dst=V.BLUE       , start_heading=3, turn='L', end_heading=2, cost=3.0),
+    DirectedEdge(src=V.LEFT       , dst=V.GREEN      , start_heading=1, turn='R', end_heading=2, cost=3.0),
+    DirectedEdge(src=V.LEFT       , dst=V.START_LEFT , start_heading=1, turn='F', end_heading=1, cost=3.0),
 
-    DirectedEdge(src=V.GREEN      , dst=V.LEFT       , start_heading=0, turn=None, end_heading=3, cost=3.0),
-    DirectedEdge(src=V.GREEN      , dst=V.START_LEFT , start_heading=0, turn=None, end_heading=1, cost=4.0),
+    DirectedEdge(src=V.GREEN      , dst=V.LEFT       , start_heading=0, turn='L', end_heading=3, cost=3.0),
+    DirectedEdge(src=V.GREEN      , dst=V.START_LEFT , start_heading=0, turn='R', end_heading=1, cost=4.0),
 
-    DirectedEdge(src=V.START_LEFT , dst=V.LEFT       , start_heading=3, turn=None, end_heading=3, cost=3.0),
-    DirectedEdge(src=V.START_LEFT , dst=V.GREEN      , start_heading=3, turn=None, end_heading=2, cost=4.0),
-    DirectedEdge(src=V.START_LEFT , dst=V.START      , start_heading=1, turn=None, end_heading=2, cost=4.0),
-    DirectedEdge(src=V.START_LEFT , dst=V.START_RIGHT, start_heading=1, turn=None, end_heading=1, cost=4.0),
+    DirectedEdge(src=V.START_LEFT , dst=V.LEFT       , start_heading=3, turn='F', end_heading=3, cost=3.0),
+    DirectedEdge(src=V.START_LEFT , dst=V.GREEN      , start_heading=3, turn='L', end_heading=2, cost=4.0),
+    DirectedEdge(src=V.START_LEFT , dst=V.START      , start_heading=1, turn='R', end_heading=2, cost=4.0),
+    DirectedEdge(src=V.START_LEFT , dst=V.START_RIGHT, start_heading=1, turn='F', end_heading=1, cost=4.0),
 
-    DirectedEdge(src=V.START      , dst=V.START_LEFT , start_heading=0, turn=None, end_heading=3, cost=4.0),
-    DirectedEdge(src=V.START      , dst=V.START_RIGHT, start_heading=0, turn=None, end_heading=1, cost=4.0),
+    DirectedEdge(src=V.START      , dst=V.START_LEFT , start_heading=0, turn='L', end_heading=3, cost=4.0),
+    DirectedEdge(src=V.START      , dst=V.START_RIGHT, start_heading=0, turn='R', end_heading=1, cost=4.0),
 
-    DirectedEdge(src=V.START_RIGHT, dst=V.START      , start_heading=3, turn=None, end_heading=3, cost=4.0),
-    DirectedEdge(src=V.START_RIGHT, dst=V.START_LEFT , start_heading=3, turn=None, end_heading=2, cost=4.0),
-    DirectedEdge(src=V.START_RIGHT, dst=V.RIGHT      , start_heading=1, turn=None, end_heading=1, cost=3.0),
-    DirectedEdge(src=V.START_RIGHT, dst=V.YELLOW     , start_heading=1, turn=None, end_heading=2, cost=4.0),
+    DirectedEdge(src=V.START_RIGHT, dst=V.START      , start_heading=3, turn='F', end_heading=3, cost=4.0),
+    DirectedEdge(src=V.START_RIGHT, dst=V.START_LEFT , start_heading=3, turn='L', end_heading=2, cost=4.0),
+    DirectedEdge(src=V.START_RIGHT, dst=V.RIGHT      , start_heading=1, turn='F', end_heading=1, cost=3.0),
+    DirectedEdge(src=V.START_RIGHT, dst=V.YELLOW     , start_heading=1, turn='R', end_heading=2, cost=4.0),
 
-    DirectedEdge(src=V.YELLOW     , dst=V.START_RIGHT, start_heading=0, turn=None, end_heading=3, cost=4.0),
-    DirectedEdge(src=V.YELLOW     , dst=V.RIGHT      , start_heading=0, turn=None, end_heading=1, cost=3.0),
+    DirectedEdge(src=V.YELLOW     , dst=V.START_RIGHT, start_heading=0, turn='L', end_heading=3, cost=4.0),
+    DirectedEdge(src=V.YELLOW     , dst=V.RIGHT      , start_heading=0, turn='R', end_heading=1, cost=3.0),
 
-    DirectedEdge(src=V.RIGHT      , dst=V.START_RIGHT, start_heading=3, turn=None, end_heading=3, cost=3.0),
-    DirectedEdge(src=V.RIGHT      , dst=V.YELLOW     , start_heading=3, turn=None, end_heading=2, cost=3.0),
-    DirectedEdge(src=V.RIGHT      , dst=V.B_DOWN_BEG , start_heading=1, turn=None, end_heading=0, cost=5.0),
-    DirectedEdge(src=V.RIGHT      , dst=V.RED        , start_heading=1, turn=None, end_heading=2, cost=3.0),
+    DirectedEdge(src=V.RIGHT      , dst=V.START_RIGHT, start_heading=3, turn='F', end_heading=3, cost=3.0),
+    DirectedEdge(src=V.RIGHT      , dst=V.YELLOW     , start_heading=3, turn='L', end_heading=2, cost=3.0),
+    DirectedEdge(src=V.RIGHT      , dst=V.B_DOWN_BEG , start_heading=1, turn='L', end_heading=0, cost=5.0),
+    DirectedEdge(src=V.RIGHT      , dst=V.RED        , start_heading=1, turn='R', end_heading=2, cost=3.0),
 
-    DirectedEdge(src=V.RED        , dst=V.RIGHT      , start_heading=0, turn=None, end_heading=3, cost=3.0),
-    DirectedEdge(src=V.RED        , dst=V.B_DOWN_BEG , start_heading=0, turn=None, end_heading=0, cost=6.0),
+    DirectedEdge(src=V.RED        , dst=V.RIGHT      , start_heading=0, turn='L', end_heading=3, cost=3.0),
+    DirectedEdge(src=V.RED        , dst=V.B_DOWN_BEG , start_heading=0, turn='F', end_heading=0, cost=6.0),
 
-    DirectedEdge(src=V.B_DOWN_BEG , dst=V.RIGHT      , start_heading=2, turn=None, end_heading=3, cost=5.0),
-    DirectedEdge(src=V.B_DOWN_BEG , dst=V.RED        , start_heading=2, turn=None, end_heading=2, cost=6.0),
-    DirectedEdge(src=V.B_DOWN_BEG , dst=V.B_DOWN_END , start_heading=0, turn=None, end_heading=0, cost=6.0),
+    DirectedEdge(src=V.B_DOWN_BEG , dst=V.RIGHT      , start_heading=2, turn='R', end_heading=3, cost=5.0),
+    DirectedEdge(src=V.B_DOWN_BEG , dst=V.RED        , start_heading=2, turn='F', end_heading=2, cost=6.0),
+    DirectedEdge(src=V.B_DOWN_BEG , dst=V.B_DOWN_END , start_heading=0, turn='F', end_heading=0, cost=6.0),
 
-    DirectedEdge(src=V.B_DOWN_END , dst=V.B_DOWN_BEG , start_heading=2, turn=None, end_heading=2, cost=6.0),
-    DirectedEdge(src=V.B_DOWN_END , dst=V.DOWN_RIGHT , start_heading=0, turn=None, end_heading=3, cost=6.0),
+    DirectedEdge(src=V.B_DOWN_END , dst=V.B_DOWN_BEG , start_heading=2, turn='F', end_heading=2, cost=6.0),
+    DirectedEdge(src=V.B_DOWN_END , dst=V.DOWN_RIGHT , start_heading=0, turn='L', end_heading=3, cost=6.0),
 
-    DirectedEdge(src=V.DOWN_RIGHT , dst=V.B_DOWN_END , start_heading=1, turn=None, end_heading=2, cost=6.0),
-    DirectedEdge(src=V.DOWN_RIGHT , dst=V.DOWN_LEFT  , start_heading=3, turn=None, end_heading=2, cost=8.0),
-    DirectedEdge(src=V.DOWN_RIGHT , dst=V.RAMP       , start_heading=3, turn=None, end_heading=3, cost=8.0),
+    DirectedEdge(src=V.DOWN_RIGHT , dst=V.B_DOWN_END , start_heading=1, turn='R', end_heading=2, cost=6.0),
+    DirectedEdge(src=V.DOWN_RIGHT , dst=V.DOWN_LEFT  , start_heading=3, turn='L', end_heading=2, cost=8.0),
+    DirectedEdge(src=V.DOWN_RIGHT , dst=V.RAMP       , start_heading=3, turn='F', end_heading=3, cost=8.0),
 
-    DirectedEdge(src=V.A_UP_END   , dst=V.UP_LEFT    , start_heading=0, turn=None, end_heading=1, cost=3.0),
-    DirectedEdge(src=V.A_UP_END   , dst=V.B_UP_BEG   , start_heading=2, turn=None, end_heading=0, cost=6.0),
+    DirectedEdge(src=V.A_UP_END   , dst=V.UP_LEFT    , start_heading=0, turn='R', end_heading=1, cost=3.0),
+    DirectedEdge(src=V.A_UP_END   , dst=V.B_UP_BEG   , start_heading=2, turn='R', end_heading=0, cost=6.0),  # 180° change
 
-    DirectedEdge(src=V.A_UP_BEG   , dst=V.A_UP_END   , start_heading=2, turn=None, end_heading=2, cost=6.0),
+    DirectedEdge(src=V.A_UP_BEG   , dst=V.A_UP_END   , start_heading=2, turn='F', end_heading=2, cost=6.0),
 
-    DirectedEdge(src=V.UP_LEFT    , dst=V.A_UP_END   , start_heading=3, turn=None, end_heading=0, cost=3.0),
-    DirectedEdge(src=V.UP_LEFT    , dst=V.RAMP       , start_heading=1, turn=None, end_heading=0, cost=5.0),
-    DirectedEdge(src=V.UP_LEFT    , dst=V.UP_RIGHT   , start_heading=1, turn=None, end_heading=1, cost=2.0),
+    DirectedEdge(src=V.UP_LEFT    , dst=V.A_UP_END   , start_heading=3, turn='R', end_heading=0, cost=3.0),
+    DirectedEdge(src=V.UP_LEFT    , dst=V.RAMP       , start_heading=1, turn='L', end_heading=0, cost=5.0),
+    DirectedEdge(src=V.UP_LEFT    , dst=V.UP_RIGHT   , start_heading=1, turn='F', end_heading=1, cost=2.0),
 
-    DirectedEdge(src=V.RAMP       , dst=V.UP_LEFT    , start_heading=2, turn=None, end_heading=3, cost=5.0),
-    DirectedEdge(src=V.RAMP       , dst=V.UP_RIGHT   , start_heading=2, turn=None, end_heading=1, cost=5.0),
-    DirectedEdge(src=V.RAMP       , dst=V.DOWN_LEFT  , start_heading=0, turn=None, end_heading=3, cost=8.0),
-    DirectedEdge(src=V.RAMP       , dst=V.DOWN_RIGHT , start_heading=0, turn=None, end_heading=1, cost=8.0),
+    DirectedEdge(src=V.RAMP       , dst=V.UP_LEFT    , start_heading=2, turn='R', end_heading=3, cost=5.0),
+    DirectedEdge(src=V.RAMP       , dst=V.UP_RIGHT   , start_heading=2, turn='L', end_heading=1, cost=5.0),
+    DirectedEdge(src=V.RAMP       , dst=V.DOWN_LEFT  , start_heading=0, turn='L', end_heading=3, cost=8.0),
+    DirectedEdge(src=V.RAMP       , dst=V.DOWN_RIGHT , start_heading=0, turn='R', end_heading=1, cost=8.0),
 
-    DirectedEdge(src=V.UP_RIGHT   , dst=V.B_UP_BEG   , start_heading=1, turn=None, end_heading=0, cost=3.0),
-    DirectedEdge(src=V.UP_RIGHT   , dst=V.RAMP       , start_heading=3, turn=None, end_heading=0, cost=5.0),
-    DirectedEdge(src=V.UP_RIGHT   , dst=V.UP_LEFT    , start_heading=3, turn=None, end_heading=3, cost=2.0),
+    DirectedEdge(src=V.UP_RIGHT   , dst=V.B_UP_BEG   , start_heading=1, turn='L', end_heading=0, cost=3.0),
+    DirectedEdge(src=V.UP_RIGHT   , dst=V.RAMP       , start_heading=3, turn='R', end_heading=0, cost=5.0),
+    DirectedEdge(src=V.UP_RIGHT   , dst=V.UP_LEFT    , start_heading=3, turn='F', end_heading=3, cost=2.0),
 
-    DirectedEdge(src=V.B_UP_BEG   , dst=V.UP_RIGHT   , start_heading=2, turn=None, end_heading=3, cost=3.0),
-    DirectedEdge(src=V.B_UP_BEG   , dst=V.B_UP_END   , start_heading=0, turn=None, end_heading=0, cost=6.0),
+    DirectedEdge(src=V.B_UP_BEG   , dst=V.UP_RIGHT   , start_heading=2, turn='R', end_heading=3, cost=3.0),
+    DirectedEdge(src=V.B_UP_BEG   , dst=V.B_UP_END   , start_heading=0, turn='F', end_heading=0, cost=6.0),
 
-    DirectedEdge(src=V.B_UP_END   , dst=V.B_UP_BEG   , start_heading=2, turn=None, end_heading=2, cost=6.0),
+    DirectedEdge(src=V.B_UP_END   , dst=V.B_UP_BEG   , start_heading=2, turn='F', end_heading=2, cost=6.0),
 
 ]
 
@@ -234,6 +236,39 @@ def shortest_path(graph: AdjList, start: "V", finish: "V") -> List["V"]:
         v = prev[v]
     path.reverse()
     return path
+
+
+
+
+def path_to_route(path):
+    global route
+    global current_heading
+    route = []
+    if path[0].start_heading - current_heading == 1 or path[0].start_heading - current_heading == -3:
+        route.append('R')
+    elif path[0].start_heading - current_heading == -1 or path[0].start_heading - current_heading == 3:
+        route.append('L')
+    elif path[0].start_heading - current_heading == 2 or path[0].start_heading - current_heading == -2:
+        route.append('B')
+    elif path[0].start_heading - current_heading == 0:
+        route.append('F')
+    for i in range(0, len(path)):
+        if i == 0:
+            continue
+        prev = path[i-1]
+        curr = path[i]
+        if i + 1 < len(path):
+            next = path[i+1]
+        else:
+            next = None
+
+        # find the directed edge that matches prev -> curr
+        for edge in DIRECTED_EDGES:
+            if edge.src == prev and edge.dst == curr:
+                route.append(edge.turn)
+                break
+
+
 
 # ------------------------------------------------------------
 # Example usage (assuming V.START and V.BLUE exist)
