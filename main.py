@@ -36,6 +36,7 @@ DEBOUNCE = 3  # front trigger must persist N cycles
 STABLE   = 1  # need N centered readings to finish a turn
 MAX_TURN_MS = 10
 DT_MS = 20
+BOXES_DELIVERED = 0
 
 
 RADIUS_OF_TURN = 16.5  # radius of turn in cm
@@ -45,7 +46,7 @@ RADIUS_OF_TURN = 16.5  # radius of turn in cm
     # turn distance is (π * 16.5) / 2 = 25.9 cm
     # Speed is 15 cm/s at power 60
     #  At power 100, speed is 25 cm/s
-    # Time to turn 25.9 cm at 25 cm/s = 1.036 s
+    # Time to turn 25.9 cm at 25 cm/s = 1.036 F
 
 def read_code():
     # return 4-bit left->right
@@ -82,18 +83,18 @@ def arc(side):
         turn_sleep(DEGREE_OF_TURN, (TURN_OUT - TURN_IN))
         print('B')
 
-    elif side == 'S':
-        branch_index += 1        # consume the 'S'
+    elif side == 'F':
+        branch_index += 1        # consume the 'F'
         go(100,100)
         sleep_ms(200)  # move forward length of line
-        print('S')
+        print('F')
 
 
     else:
-        branch_index += 1        # consume the 'S'
+        branch_index += 1        # consume the 'F'
         mL.stop(); mR.stop()
         sleep_ms(DT_MS)
-        print('X(S)')
+        print('X(F)')
 
 
 
@@ -119,14 +120,14 @@ def main():
     # sleep_ms(2000)  # initial settle
 
 
-    while True:
+    while BOXES_DELIVERED < 4:
         c = read_code()
         print("Code:",bin(c))
         FL = (c>>3)&1;  FR = c&1
         mid = (c>>1)&0b11  # inner pair
                 # If all four see white: follow the next route directive
         if c == 0b1111:
-            # if we ran out of directives, default to 'S'
+            # if we ran out of directives, default to 'F'
             action = branch_route[branch_index] if branch_index < len(branch_route) else 'X'
 
             if action == 'L':
@@ -150,16 +151,16 @@ def main():
                 sleep_ms(DT_MS)
                 continue
 
-            else:  # 'S' -> skip this node
-                turning = 'S'
+            else:  # 'F' -> skip this node
+                turning = 'F'
                 t0 = ticks_ms()
-                arc('S')                 # arc() will consume this route entry
+                arc('F')                 # arc() will consume this route entry
                 sleep_ms(DT_MS)
                 continue
         
         if c == 0b1110:
-            # if we ran out of directives, default to 'S'
-            action = branch_route[branch_index] if branch_index < len(branch_route) else 'S'
+            # if we ran out of directives, default to 'F'
+            action = branch_route[branch_index] if branch_index < len(branch_route) else 'F'
 
             if action == 'L':
                 turning = 'L'
@@ -171,16 +172,16 @@ def main():
             elif action == 'R':
                 continue
 
-            else:  # 'S' -> skip this node
-                turning = 'S'
+            else:  # 'F' -> skip this node
+                turning = 'F'
                 t0 = ticks_ms()
-                arc('S')                 # arc() will consume this route entry
+                arc('F')                 # arc() will consume this route entry
                 sleep_ms(DT_MS)
                 continue
         
         if c == 0b0111:
-            # if we ran out of directives, default to 'S'
-            action = branch_route[branch_index] if branch_index < len(branch_route) else 'S'
+            # if we ran out of directives, default to 'F'
+            action = branch_route[branch_index] if branch_index < len(branch_route) else 'F'
 
             if action == 'L':
                 continue
@@ -192,10 +193,10 @@ def main():
                 sleep_ms(DT_MS)
                 continue
 
-            else:  # 'S' -> skip this node
-                turning = 'S'
+            else:  # 'F' -> skip this node
+                turning = 'F'
                 t0 = ticks_ms()
-                arc('S')                 # arc() will consume this route entry
+                arc('F')                 # arc() will consume this route entry
                 sleep_ms(DT_MS)
                 continue
 
@@ -224,7 +225,7 @@ def main():
         #     fl_cnt = fr_cnt = 0
 
 
-# ---- follower toward 0110 (no turn) ----
+
         if centered(c):
             go(BASE, BASE)
         elif c == 0b0100:           # left inner only -> steer LEFT
