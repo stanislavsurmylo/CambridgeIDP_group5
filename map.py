@@ -1,7 +1,10 @@
 # map_graph.py  — offline planner side
 
+from __future__ import annotations
+from typing import Dict, List, Tuple, Optional, NamedTuple
+from collections import defaultdict
 from enum import IntEnum
-from typing import NamedTuple, List
+import heapq
 
 
 # ------------ headings / turns (for later) ------------
@@ -175,21 +178,69 @@ DIRECTED_EDGES = [
 
 
 
-# integers for headings
-N, E, S, W = 0, 1, 2, 3
-F, L, R, B = 0, 1, 2, 3
+AdjList = Dict["V", List[Tuple["V", float]]]
 
-# vertex IDs are already 0..17 from V enum
+def build_graph(edges: List[DirectedEdge]) -> AdjList:
+    graph: AdjList = defaultdict(list)
+    for e in edges:
+        # forward edge
+        graph[e.src].append((e.dst, e.cost))
+    return graph
 
-SEGMENTS_INT = [
-    # u, v, length
-    (V.DOWN_LEFT,  V.DOWN_RIGHT,  1),
-    (V.DOWN_LEFT,  V.RAMP,        1),
-    # ...
-]
+GRAPH: AdjList = build_graph(DIRECTED_EDGES)
 
-DIRECTED_EDGES_INT = [
-    # src, dst, start_heading, turn, end_heading, cost
-    (V.START, V.LEFT,  W, F, W, 1),
-    # ...
-]
+# ------------------------------------------------------------
+# Dijkstra from any START to all vertices
+# ------------------------------------------------------------
+
+def dijkstra(graph: AdjList, start: "V") -> Tuple[Dict["V", float], Dict["V", Optional["V"]]]:
+    dist: Dict["V", float] = {v: 100 for v in graph.keys()}
+    prev: Dict["V", Optional["V"]] = {v: None for v in graph.keys()}
+
+    dist[start] = 0.0
+    heap: List[Tuple[float, "V"]] = [(0.0, start)]  # (distance, vertex)
+
+    while heap:
+        d_u, u = heapq.heappop(heap)
+
+        # Skip stale entries
+        if d_u != dist[u]:
+            continue
+
+        for v, w in graph[u]:
+            nd = d_u + w
+            if nd < dist[v]:
+                dist[v] = nd
+                prev[v] = u
+                heapq.heappush(heap, (nd, v))
+
+    return dist, prev
+
+# ------------------------------------------------------------
+# Recover the path from START to FINISH
+# ------------------------------------------------------------
+
+def shortest_path(graph: AdjList, start: "V", finish: "V") -> List["V"]:
+    dist, prev = dijkstra(graph, start)
+
+    if dist[finish] == float("inf"):
+        # No route
+        return []
+
+    path: List["V"] = []
+    v: Optional["V"] = finish
+    while v is not None:
+        path.append(v)
+        v = prev[v]
+    path.reverse()
+    return path
+
+# ------------------------------------------------------------
+# Example usage (assuming V.START and V.BLUE exist)
+# ------------------------------------------------------------
+if __name__ == "__main__":
+    start = V.B_DOWN_BEG         # any START vertex
+    finish = V.GREEN          # any FINISH vertex
+
+    path = shortest_path(GRAPH, start, finish)
+    print("Shortest path:", path)
