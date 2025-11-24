@@ -212,18 +212,6 @@ def main():
                 turning = None; stable = 0; go(BASE, BASE); sleep_ms(DT_MS); continue
             arc(turning); sleep_ms(DT_MS); continue
 
-        # ---- detect a branch (outer sensor on one side, inner pair mostly white) ----
-        # if FL and not FR and mid == 0b11:
-        #     fl_cnt += 1; fr_cnt = 0
-        #     if fl_cnt >= DEBOUNCE:
-        #         turning = 'L'; t0 = ticks_ms(); arc('L'); sleep_ms(DT_MS); continue
-        # elif FR and not FL and mid == 0b11:
-        #     fr_cnt += 1; fl_cnt = 0
-        #     if fr_cnt >= DEBOUNCE:
-        #         turning = 'R'; t0 = ticks_ms(); arc('R'); sleep_ms(DT_MS); continue
-        # else:
-        #     fl_cnt = fr_cnt = 0
-
 
 
         if centered(c):
