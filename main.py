@@ -193,7 +193,7 @@ def complete_route(branch_route):
     fl_cnt = fr_cnt = 0
     stable = 0
     t0 = 0
-    while branch_index < len(branch_route):
+    while branch_index < len(branch_route) or not centered(read_code()):
         print(current_heading)
         c = read_code()
         #print("Code:",bin(c))
@@ -322,7 +322,7 @@ def complete_route(branch_route):
 
         sleep_ms(DT_MS)
     go(BASE, BASE)
-    sleep_ms(500)
+    sleep_ms(100)
     current_heading = finish_heading
 
 
