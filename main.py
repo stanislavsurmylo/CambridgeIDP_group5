@@ -322,7 +322,7 @@ def complete_route(branch_route):
 
         sleep_ms(DT_MS)
     go(BASE, BASE)
-    sleep_ms(200)
+    sleep_ms(500)
     current_heading = finish_heading
 
 
