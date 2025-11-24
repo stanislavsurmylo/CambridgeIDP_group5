@@ -126,6 +126,45 @@ def skip_loading_bay():
 
 
 
+def path_to_route(path):
+    global current_heading
+    route = []
+    prev = path[0]
+    curr = path[1]
+    for edge in DIRECTED_EDGES:
+        if edge.src == prev and edge.dst == curr:
+            if edge.start_heading - current_heading == 1 or edge.start_heading - current_heading == -3:
+                route.append('R')
+            elif edge.start_heading - current_heading == -1 or edge.start_heading - current_heading == 3:
+                route.append('L')
+            elif edge.start_heading - current_heading == 2 or edge.start_heading - current_heading == -2:
+                route.append('B')
+            elif edge.start_heading - current_heading == 0:
+                route.append('F')
+            break
+    for i in range(0, len(path)):
+        if i == 0:
+            continue
+        prev = path[i-1]
+        curr = path[i]
+        if i + 1 < len(path):
+            next = path[i+1]
+        else:
+            next = None
+        # find the directed edge that matches prev -> curr
+        for edge in DIRECTED_EDGES:
+            if edge.src in [B_DOWN_BEG, B_DOWN_END, A_DOWN_BEG, A_DOWN_END, B_UP_BEG, B_UP_END, A_UP_BEG, A_UP_END] and edge.dst in [B_DOWN_BEG, B_DOWN_END, A_DOWN_BEG, A_DOWN_END, B_UP_BEG, B_UP_END, A_UP_BEG, A_UP_END]:
+                for i in range(8):
+                    route.append('F')
+            if edge.src == prev and edge.dst == curr:
+                route.append(edge.turn)
+                break
+        current_heading = edge.end_heading  
+        
+    return route
+
+
+
 
 def complete_route(branch_route):
     global current_heading
@@ -149,7 +188,7 @@ def complete_route(branch_route):
     t0 = 0
     while branch_index < len(branch_route):
         c = read_code()
-        # print("Code:",bin(c))
+        #print("Code:",bin(c))
         FL = (c>>3)&1;  FR = c&1
         mid = (c>>1)&0b11  # inner pair
                 # If all four see white: follow the next route directive
@@ -289,12 +328,18 @@ def main():
     graph = map.GRAPH
     finish_vertex = V.GREEN
     current_path = map.shortest_path(graph, current_vertex, finish_vertex)
-    for i in len(current_path):
-        print(map.VERTEX_NAMES[vertex], end=" -> ")
-        if current_path[i] in [V.B_DOWN_BEG, V.A_DOWN_BEG, V.A_UP_BEG, V.B_UP_BEG, V.B_DOWN_END, V.A_DOWN_END, V.A_UP_END, V.B_UP_END] and current_path[i+1] in [V.B_DOWN_BEG, V.A_DOWN_BEG, V.A_UP_BEG, V.B_UP_BEG, V.B_DOWN_END, V.A_DOWN_END, V.A_UP_END, V.B_UP_END]:
-            skip_loading_bay()
-    branch_route = map.path_to_branch_route(graph, path)
+    print("Path:", current_path)
+    branch_route = path_to_branch_route(graph, path)
+    print("Route:", branch_route)
     complete_route(branch_route)
+    current_vertex = finish_vertex
+    finish_vertex = V.START
+    current_path = map.shortest_path(graph, current_vertex, finish_vertex)
+    print("Path:", current_path)
+    branch_route = path_to_branch_route(graph, path)
+    print("Route:", branch_route)
+    complete_route(branch_route)
+    current_vertex = finish_vertex
     
 
 main()

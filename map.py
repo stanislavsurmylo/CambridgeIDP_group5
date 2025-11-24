@@ -242,41 +242,6 @@ def shortest_path(graph: AdjList, start: "V", finish: "V") -> List["V"]:
     return path
 
 
-current_heading = 0  # initial heading; adjust as needed
-
-def path_to_route(path):
-    global current_heading
-    route = []
-    prev = path[0]
-    curr = path[1]
-    for edge in DIRECTED_EDGES:
-        if edge.src == prev and edge.dst == curr:
-            if edge.start_heading - current_heading == 1 or edge.start_heading - current_heading == -3:
-                route.append('R')
-            elif edge.start_heading - current_heading == -1 or edge.start_heading - current_heading == 3:
-                route.append('L')
-            elif edge.start_heading - current_heading == 2 or edge.start_heading - current_heading == -2:
-                route.append('B')
-            elif edge.start_heading - current_heading == 0:
-                route.append('F')
-            break
-    for i in range(0, len(path)):
-        if i == 0:
-            continue
-        prev = path[i-1]
-        curr = path[i]
-        if i + 1 < len(path):
-            next = path[i+1]
-        else:
-            next = None
-        # find the directed edge that matches prev -> curr
-        for edge in DIRECTED_EDGES:
-            if edge.src == prev and edge.dst == curr:
-                route.append(edge.turn)
-                break
-        current_heading = edge.end_heading  
-        
-    return route
 
 
 
