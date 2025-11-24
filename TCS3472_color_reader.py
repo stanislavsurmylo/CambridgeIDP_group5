@@ -5,9 +5,9 @@ from utime import sleep
 I2C_ID = 0
 PIN_SDA = 8   # GP8 (SDA)
 PIN_SCL = 9   # GP9 (SCL)
-UART_ID = 0   # UART0 for start/stop commands
-UART_BAUD = 115200
-SAMPLE_INTERVAL_SECONDS = 0.5
+POWER_PIN = 0 # GPIO controlling sensor power (via transistor/FET)
+ON_TIME_SECONDS = 1
+OFF_TIME_SECONDS = 1
 
 
 def setup_sensor():
@@ -28,51 +28,46 @@ def detect_color(rgb, light):
     g_ratio = g / total
     b_ratio = b / total
 
+    if r_ratio > 0.33 and g_ratio > 0.33:
+        return "YELLOW"
     if r_ratio > 0.33 and r > 100:
         return "RED"
     if g_ratio > 0.33 and g > 80:
         return "GREEN"
     if b_ratio > 0.33 and b > 100:
         return "BLUE"
-    if r_ratio > 0.33 and g_ratio > 0.33:
-        return "YELLOW"
+
     return "UNKNOWN"
 
 def main():
-    sensor = setup_sensor()
-    uart = UART(UART_ID, baudrate=UART_BAUD)
-    sensor_enabled = False
+    power_ctrl = Pin(POWER_PIN, Pin.OUT, value=0)
 
-    print("TCS3472 color reader ready.")
-    print("Send '1' over UART0 to START, '0' to STOP.")
+    try:
+        while True:
+            # Power ON
+            power_ctrl.value(1)
+            sleep(0.05)  # allow sensor to power up
+            sensor = setup_sensor()
+            sleep(0.76) # integration time for sensor reading
+            light = sensor.light()
+            rgb = sensor.rgb()
+            color = detect_color(rgb, light)
+            print("ON  -> Light:", light, "RGB:", rgb, "Color:", color)
+            
 
-    while True:
-        try:
-            if uart.any():
-                cmd = uart.read(1)
-                if cmd == b'1':
-                    sensor_enabled = True
-                    print("Color sensor ENABLED")
-                elif cmd == b'0':
-                    sensor_enabled = False
-                    print("Color sensor DISABLED")
-            if sensor_enabled:
-                light = sensor.light()
-                rgb = sensor.rgb()
-                color = detect_color(rgb, light)
-                print("Light:", light)
-                print("RGB:", rgb)
-                print("Color:", color)
-            else:
-                print("Sensor OFF (waiting for UART command '1')")
-            sleep(SAMPLE_INTERVAL_SECONDS)
-        except KeyboardInterrupt:
-            print("\nStopping TCS3472 reader.")
-            break
-        except Exception as e:
-            print("Sensor error:", e)
-            sleep(1.0)
+            # Power OFF
+            power_ctrl.value(0)
+            print("OFF")
+            sleep(OFF_TIME_SECONDS)
+
+    except KeyboardInterrupt:
+        print("\nStopping TCS3472 reader.")
+        power_ctrl.value(0)
+    except Exception as e:
+        print("Sensor error:", e)
+        power_ctrl.value(0)
 
 if __name__ == "__main__":
     main()
+
 
