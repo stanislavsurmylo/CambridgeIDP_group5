@@ -1,27 +1,29 @@
 # map_graph.py  — offline planner side
 
-from __future__ import annotations
-from typing import Dict, List, Tuple, Optional, NamedTuple
-from collections import defaultdict
-from enum import IntEnum
+try:
+    from typing import Dict, List, Tuple, Optional
+    AdjList = Dict["V", List[Tuple["V", float]]]
+except ImportError:
+    Dict = dict
+    List = list
+    Tuple = tuple
+    Optional = object
+    AdjList = dict  # just a runtime alias; hints don’t matter on Pico
+# --- defaultdict fallback ---------------------------------------
+# --- IntEnum fallback -------------------------------------------------
+try:
+    from enum import IntEnum
+except ImportError:
+    # Minimal stand-in for MicroPython
+    class IntEnum(int):
+        
+        def __new__(cls, value):
+            return int.__new__(cls, value)
+
 import heapq
 
 
 # ------------ headings / turns (for later) ------------
-
-class Heading(IntEnum):
-    N = 0
-    E = 1
-    S = 2
-    W = 3
- 
-# qfdewdwd 
-
-class Turn(IntEnum):
-    F = 0   # straight
-    L = 1   # left
-    R = 2   # right
-    B = 3   # 180° (if you ever want it)
 
 
 # ------------ vertices ------------
@@ -75,19 +77,19 @@ VERTEX_NAMES = {
     V.B_UP_BEG:    "B_UP_BEG",
     V.B_UP_END:    "B_UP_END",
 }
-class Segment(NamedTuple):
-    u: V
-    v: V
-    length: float  # placeholder; tune from real geometry
 
+class DirectedEdge:
+    __slots__ = ("src", "dst", "start_heading", "turn", "end_heading", "cost")
 
-class DirectedEdge(NamedTuple):
-    src: V
-    dst: V
-    start_heading: Heading
-    turn: Turn
-    end_heading: Heading
-    cost: float
+    def __init__(self, src: V, dst: V,
+        start_heading: int, turn: str,
+        end_heading: int, cost: float):
+        self.src = src
+        self.dst = dst
+        self.start_heading = start_heading
+        self.turn = turn
+        self.end_heading = end_heading
+        self.cost = cost
 
 
 # ------------ directed edges ------------
@@ -181,15 +183,19 @@ DIRECTED_EDGES = [
 
 
 
-AdjList = Dict["V", List[Tuple["V", float]]]
+
 
 def build_graph(edges: List[DirectedEdge]) -> AdjList:
-    graph: AdjList = defaultdict(list)
-    for e in edges:
-        # forward edge
-        graph[e.src].append((e.dst, e.cost))
-    return graph
+    # plain dict is enough; no need for defaultdict
+    graph = {}  # type: ignore[assignment]  # if mypy complains
 
+    for e in edges:
+        # ensure src list exists, then append
+        graph.setdefault(e.src, []).append((e.dst, e.cost))
+        # ensure dst also exists as a key (even if it has no outgoing edges)
+        graph.setdefault(e.dst, [])
+
+    return graph
 GRAPH: AdjList = build_graph(DIRECTED_EDGES)
 
 # ------------------------------------------------------------
@@ -253,6 +259,4 @@ if __name__ == "__main__":
      finish = V.GREEN          # any FINISH vertex
 
      path = shortest_path(GRAPH, start, finish)
-     route = path_to_route(path)
-     print("Shortest path:", path)
-     print("Route:", route)
+     print("Shortest path:", path)  
