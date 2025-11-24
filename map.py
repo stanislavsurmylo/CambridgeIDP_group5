@@ -206,6 +206,9 @@ def dijkstra(graph: AdjList, start: "V") -> Tuple[Dict["V", float], Dict["V", Op
     while heap:
         d_u, u = heapq.heappop(heap)
 
+
+
+
         # Skip stale entries
         if d_u != dist[u]:
             continue
@@ -266,12 +269,13 @@ def path_to_route(path):
             next = path[i+1]
         else:
             next = None
-
         # find the directed edge that matches prev -> curr
         for edge in DIRECTED_EDGES:
             if edge.src == prev and edge.dst == curr:
                 route.append(edge.turn)
                 break
+        current_heading = edge.end_heading  
+        
     return route
 
 
