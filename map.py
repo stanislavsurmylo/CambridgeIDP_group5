@@ -124,8 +124,8 @@ DIRECTED_EDGES = [
     DirectedEdge(src=V.START      , dst=V.START_LEFT , start_heading=0, turn='L', end_heading=3, cost=4.0),
     DirectedEdge(src=V.START      , dst=V.START_RIGHT, start_heading=0, turn='R', end_heading=1, cost=4.0),
 
-    DirectedEdge(src=V.START_RIGHT, dst=V.START      , start_heading=3, turn='F', end_heading=3, cost=4.0),
-    DirectedEdge(src=V.START_RIGHT, dst=V.START_LEFT , start_heading=3, turn='L', end_heading=2, cost=4.0),
+    DirectedEdge(src=V.START_RIGHT, dst=V.START      , start_heading=3, turn='L', end_heading=2, cost=4.0),
+    DirectedEdge(src=V.START_RIGHT, dst=V.START_LEFT , start_heading=3, turn='F', end_heading=3, cost=4.0),
     DirectedEdge(src=V.START_RIGHT, dst=V.RIGHT      , start_heading=1, turn='F', end_heading=1, cost=3.0),
     DirectedEdge(src=V.START_RIGHT, dst=V.YELLOW     , start_heading=1, turn='R', end_heading=2, cost=4.0),
 
@@ -152,8 +152,8 @@ DIRECTED_EDGES = [
     DirectedEdge(src=V.DOWN_RIGHT , dst=V.RAMP       , start_heading=3, turn='F', end_heading=3, cost=8.0),
 
     DirectedEdge(src=V.A_UP_END   , dst=V.UP_LEFT    , start_heading=0, turn='R', end_heading=1, cost=3.0),
-    DirectedEdge(src=V.A_UP_END   , dst=V.A_UP_BEG   , start_heading=0, turn='F', end_heading=0, cost=6.0),  # 180° change?
-
+    DirectedEdge(src=V.A_UP_END   , dst=V.A_UP_BEG   , start_heading=0, turn='F', end_heading=0, cost=6.0), 
+    
     DirectedEdge(src=V.A_UP_BEG   , dst=V.A_UP_END   , start_heading=2, turn='F', end_heading=2, cost=6.0),
 
     DirectedEdge(src=V.UP_LEFT    , dst=V.A_UP_END   , start_heading=3, turn='R', end_heading=0, cost=3.0),
@@ -238,20 +238,24 @@ def shortest_path(graph: AdjList, start: "V", finish: "V") -> List["V"]:
     return path
 
 
-
+current_heading = 0  # initial heading; adjust as needed
 
 def path_to_route(path):
-    global route
     global current_heading
     route = []
-    if path[0].start_heading - current_heading == 1 or path[0].start_heading - current_heading == -3:
-        route.append('R')
-    elif path[0].start_heading - current_heading == -1 or path[0].start_heading - current_heading == 3:
-        route.append('L')
-    elif path[0].start_heading - current_heading == 2 or path[0].start_heading - current_heading == -2:
-        route.append('B')
-    elif path[0].start_heading - current_heading == 0:
-        route.append('F')
+    prev = path[0]
+    curr = path[1]
+    for edge in DIRECTED_EDGES:
+        if edge.src == prev and edge.dst == curr:
+            if edge.start_heading - current_heading == 1 or edge.start_heading - current_heading == -3:
+                route.append('R')
+            elif edge.start_heading - current_heading == -1 or edge.start_heading - current_heading == 3:
+                route.append('L')
+            elif edge.start_heading - current_heading == 2 or edge.start_heading - current_heading == -2:
+                route.append('B')
+            elif edge.start_heading - current_heading == 0:
+                route.append('F')
+            break
     for i in range(0, len(path)):
         if i == 0:
             continue
@@ -267,6 +271,7 @@ def path_to_route(path):
             if edge.src == prev and edge.dst == curr:
                 route.append(edge.turn)
                 break
+    return route
 
 
 
@@ -274,8 +279,10 @@ def path_to_route(path):
 # Example usage (assuming V.START and V.BLUE exist)
 # ------------------------------------------------------------
 if __name__ == "__main__":
-    start = V.B_DOWN_BEG         # any START vertex
-    finish = V.GREEN          # any FINISH vertex
+     start = V.B_UP_END         # any START vertex
+     finish = V.GREEN          # any FINISH vertex
 
-    path = shortest_path(GRAPH, start, finish)
-    print("Shortest path:", path)
+     path = shortest_path(GRAPH, start, finish)
+     route = path_to_route(path)
+     print("Shortest path:", path)
+     print("Route:", route)
