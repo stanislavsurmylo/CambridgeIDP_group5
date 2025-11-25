@@ -118,8 +118,8 @@ def turn_sleep(deg, speed):
     sleep_ms(int(time_ms))
 
 def spin_sleep(deg, speed):
-    distance = (deg / 180) * 3.14 * RADIUS_OF_TURN//2  # distance to travel
-    time_ms = (distance*0.5 / (speed * 0.25)) * 1000  # time in ms
+    distance = (deg / 180) * 3.14 * RADIUS_OF_TURN  # distance to travel
+    time_ms = (distance*0.65 / (speed * 0.25)) * 1000  # time in ms
     sleep_ms(int(time_ms))
 
 
@@ -127,8 +127,8 @@ def centered(c):   return c == 0b0110
 def slight_left(c):  return c == 0b0100
 def slight_right(c): return c == 0b0010
 
-def skip_loading_bay():
-    complete_route(['F','F','F','F','F','F','F','F'])
+# def skip_loading_bay():
+#     complete_route(['F','F','F','F','F','F','F','F'])
 
 
 
@@ -161,7 +161,7 @@ def path_to_route(path):
         for edge in map.DIRECTED_EDGES:
             if edge.src == prev and edge.dst == curr:
                 if edge.src in [V.B_DOWN_BEG, V.B_DOWN_END, V.A_DOWN_BEG, V.A_DOWN_END, V.B_UP_BEG, V.B_UP_END, V.A_UP_BEG, V.A_UP_END] and edge.dst in [V.B_DOWN_BEG, V.B_DOWN_END, V.A_DOWN_BEG, V.A_DOWN_END, V.B_UP_BEG, V.B_UP_END, V.A_UP_BEG, V.A_UP_END]:
-                    for i in range(8):
+                    for i in range(7):
                         route.append('F')
                 else:
                     route.append(edge.turn)
@@ -322,7 +322,7 @@ def complete_route(branch_route):
 
         sleep_ms(DT_MS)
     go(BASE, BASE)
-    sleep_ms(100)
+    sleep_ms(200)
     current_heading = finish_heading
 
 
@@ -337,6 +337,20 @@ def main():
     global finish_vertex
     graph = map.GRAPH
     finish_vertex = V.GREEN
+    current_path = map.shortest_path(graph, current_vertex, finish_vertex)
+    print("Path:", current_path)
+    branch_route = path_to_route(current_path)
+    print("Route:", branch_route)
+    complete_route(branch_route)
+    current_vertex = finish_vertex
+    finish_vertex = V.RAMP
+    current_path = map.shortest_path(graph, current_vertex, finish_vertex)
+    print("Path:", current_path)
+    branch_route = path_to_route(current_path)
+    print("Route:", branch_route)
+    complete_route(branch_route)
+    current_vertex = finish_vertex
+    finish_vertex = V.YELLOW
     current_path = map.shortest_path(graph, current_vertex, finish_vertex)
     print("Path:", current_path)
     branch_route = path_to_route(current_path)
