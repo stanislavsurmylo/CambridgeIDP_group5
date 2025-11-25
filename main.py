@@ -16,6 +16,7 @@ def W(x): return x == WHITE_LEVEL
 # branch_index = 0
 current_heading = 0
 current_vertex = V.START
+current_path = []
 finish_vertex = None
 finish_heading = None
 
@@ -68,6 +69,7 @@ def read_code():
 
 
 def go(vL, vR): mL.fwd(vL); mR.fwd(vR)
+def go_back(vL, vR): mL.bwd(vL); mR.bwd(vR)
 def spin_left(v): mL.bwd(v); mR.fwd(v)
 def spin_right(v): mL.fwd(v); mR.bwd(v)
 
@@ -233,6 +235,7 @@ def complete_route(branch_route):
                 branch_index += arc('F')                 # branch_index += arc() will consume this route entry
                 sleep_ms(DT_MS)
                 continue
+
         
         if c == 0b1110:
             # if we ran out of directives, default to 'F'
@@ -243,17 +246,21 @@ def complete_route(branch_route):
                 t0 = ticks_ms()
                 branch_index += arc('L')                 # branch_index += arc() will consume this route entry
                 sleep_ms(DT_MS)
-                continue
 
             elif action == 'R':
-                continue
+                pass
 
             else:  # 'F' -> skip this node
                 turning = 'F'
                 t0 = ticks_ms()
                 branch_index += arc('F')                 # branch_index += arc() will consume this route entry
                 sleep_ms(DT_MS)
-                continue
+                
+
+            # if current_path[branch_index] in [V.B_UP_BEG, V.A_UP_END] and current_path[branch_index - 1] in [V.UP_LEFT, V.UP_RIGHT]:
+            #     go_back(BASE,BASE)
+            #     sleep_ms(150)
+            # # in case there is not enough space after turn
         
         if c == 0b0111:
             # if we ran out of directives, default to 'F'
@@ -335,6 +342,7 @@ def complete_route(branch_route):
 def main():
     global current_vertex
     global finish_vertex
+    global current_path
     graph = map.GRAPH
     finish_vertex = V.GREEN
     current_path = map.shortest_path(graph, current_vertex, finish_vertex)
