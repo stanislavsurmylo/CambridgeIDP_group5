@@ -4,7 +4,12 @@ from time import sleep_ms, ticks_ms, ticks_diff
 import map
 from map import V
 import map
-from map import V
+from vl53l0x_distance import setup_sensor, vl5310x_read_distance
+from tmf8701_distance import setup_sensor, tmf8701_read_distance
+
+setup_sensor1 = setup_sensor()
+
+
 
 # ----- SENSORS (left->right). Swap sFL,sFR wires here if needed -----
 S_FL = Pin(19, Pin.IN)   # front-left  (outer)
@@ -201,6 +206,75 @@ def path_to_route(path):
     return route
 
 
+def seek_and_find(LoadingBay):
+    global current_heading
+    box_approached = 0
+    turn_counter = 0
+    box_found = False
+    pickup_completed = False
+    for edge in map.DIRECTED_EDGES:
+        if edge.src == LoadingBay and edge.dst in [V.B_DOWN_END, V.A_DOWN_END, V.B_UP_END, V.A_UP_END]:
+            if edge.start_heading - current_heading == 2 or edge.start_heading - current_heading == -2:
+                spin_right(BASE)
+                spin_sleep(180, BASE)
+    
+    while not pickup_completed:
+        c = read_code()
+        #print("Code:",bin(c))
+        FL = (c>>3)&1;  FR = c&1
+        mid = (c>>1)&0b11  # inner pair
+                # If all four see white: follow the next route directive
+        #print(branch_index)
+        
+        if c == 0b1110 and not box_found:
+            turn_counter += 1
+            # if we ran out of directives, default to 'F'
+            sensor_distance1 = vl5310x_read_distance(setup_sensor1)
+            print("Distance:", sensor_distance1)
+            if sensor_distance1 < TARGET_DISTANCE:
+                tick1 = ticks_ms()
+                if tick1 - tick0 > 50:
+                    box_found = True
+                    continue
+                
+        else:  # 'F' -> skip this node
+            tick0 = ticks_ms()
+
+        # if c == 0b1110 and box_found:
+        #     x += arc('L')                 # branch_index += arc() will consume this route entry
+        #     sleep_ms(DT_MS)
+        #     continue
+
+        if c == 0b1110 and box_found:
+            go_spin(90)                 # branch_index += arc() will consume this route entry
+            sleep_ms(DT_MS)
+            box_approached = 1
+            continue
+
+        # if box_approached == 1:
+        #     # if we ran out of directives, default to 'F'
+        #     sensor_distance2 = vl5310x_read_distance(setup_sensor1)
+        #     print("Distance:", sensor_distance1)
+        #     if sensor_distance1 < TARGET_DISTANCE:
+        #         tick1 = ticks_ms()
+        #         if tick1 - tick0 > 50:
+        #             box_found = True
+        #             continue
+            
+
+        if centered(c):
+            go(BASE, BASE)
+        elif c == 0b0100:           # left inner only -> steer LEFT
+            go(BASE-DELTA, BASE+DELTA)
+        elif c == 0b0010:           # right inner only -> steer RIGHT
+            go(BASE+DELTA, BASE-DELTA)
+        elif c in (0b1100, 0b1000): # far to left
+            go(BASE-HARD, BASE+HARD)
+        elif c in (0b0011, 0b0001): # far to right
+            go(BASE+HARD, BASE-HARD)
+        else:
+            # unknown/lost -> gentle bias to move forward
+            go(BASE, BASE-10)
 
 
 def complete_route(branch_route):
@@ -224,9 +298,9 @@ def complete_route(branch_route):
     stable = 0
     t0 = 0
     while branch_index < len(branch_route) or not centered(read_code()):
-        print(current_heading)
+        #print(current_heading)
         c = read_code()
-        #print("Code:",bin(c))
+        print("Code:",bin(c))
         FL = (c>>3)&1;  FR = c&1
         mid = (c>>1)&0b11  # inner pair
                 # If all four see white: follow the next route directive
