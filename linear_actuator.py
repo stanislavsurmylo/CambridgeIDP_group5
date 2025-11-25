@@ -27,30 +27,18 @@ DIR_PIN = 3
 PWM_PIN = 2
 TEST_DURATION = 1.0  # 1 second for testing
 
-def test_actuator():
-    """Test function: extend for 1 second, then retract for 1 second"""
+def unload_robot():
+
+    # Unloading robot to reduce weight on actuator
     actuator = Actuator(DIR_PIN, PWM_PIN)
     
-    print("Starting actuator test...")
-    print("=" * 40)
-    
-    # Test extend
-    print("Extending for {} seconds...".format(TEST_DURATION))
-    actuator.extend(speed=50)
-    sleep(TEST_DURATION)
-    actuator.stop()
-    print("Extended - measure distance now")
-    sleep(2)  # Pause so you can measure
-    
     # Test retract
-    print("\nRetracting for {} seconds...".format(TEST_DURATION))
-    actuator.retract(speed=50)
-    sleep(TEST_DURATION)
+    actuator.retract(speed=100)
+    sleep(5)
     actuator.stop()
-    print("Retracted - measure distance now")
     sleep(2)  # Pause so you can measure
     
-    print("\nTest complete!")
+    print("Unloading complete")
 
 
 if __name__ == "__main__":
