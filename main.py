@@ -363,16 +363,16 @@ def main():
 
     while boxes_delivered < 4:
 
-        go_to(last_checked_bay) 
-        # we go to last loading bay spot and check if there are any boxes in there. If there are, we pick them up and transport them.
-        # if check_for_boxes() is not None: #if we found any boxes there
-        #   pick_up_boxes()
-        #   color = check_for_boxes()  # get the color of the box
+        # go_to(last_checked_bay) 
+        # # we go to last loading bay spot and check if there are any boxes in there. If there are, we pick them up and transport them.
+        # if seek_and_find(last_checked_bay) is not None: #if we found any boxes there
+        #   color = seek_and_find(last_checked_bay)  # get the color of the box
         #   delivery_area = color_to_vertex(color)  # map color to vertex
         #   go_to(delivery_area)  # go to delivery area
-        #   boxes_delivered += 1
+        #   boxes_delivered += 1 # increment boxes delivered
         # else:
-        #   number_of_bay = (number_of_bay + 1) % len(loading_bays)
+        #   number_of_bay = (number_of_bay + 1) % len(loading_bays) # set target to next bay
+        #   unload_robot() # unload any boxes we have
 
     go_to(V.START)
     go(0,0)
