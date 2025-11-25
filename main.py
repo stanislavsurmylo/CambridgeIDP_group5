@@ -300,7 +300,7 @@ def complete_route(branch_route):
     while branch_index < len(branch_route) or not centered(read_code()):
         #print(current_heading)
         c = read_code()
-        print("Code:",bin(c))
+        #print("Code:",bin(c))
         FL = (c>>3)&1;  FR = c&1
         mid = (c>>1)&0b11  # inner pair
                 # If all four see white: follow the next route directive
