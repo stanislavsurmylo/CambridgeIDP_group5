@@ -3,8 +3,7 @@ from machine import Pin, PWM
 from time import sleep_ms, ticks_ms, ticks_diff
 import map
 from map import V
-import map
-from map import V
+
 
 # ----- SENSORS (left->right). Swap sFL,sFR wires here if needed -----
 S_FL = Pin(19, Pin.IN)   # front-left  (outer)
@@ -14,14 +13,11 @@ S_FR = Pin(20, Pin.IN)   # front-right (outer)
 WHITE_LEVEL = 1
 def W(x): return x == WHITE_LEVEL
 
-
 # branch_route = []  path = list of vertices; route = list of 'L','R','F','B'
 # branch_index = 0
 current_heading = 0
 current_vertex = V.START
 finish_vertex = None
-finish_heading = None
-
 
 # ----- MOTORS -----
 INVERT_LEFT  = False     # flip these until forward() drives robot forward
@@ -76,43 +72,42 @@ def spin_left(v): mL.bwd(v); mR.fwd(v)
 def spin_right(v): mL.fwd(v); mR.bwd(v)
 
 def arc(side):
+    global branch_index
     global current_heading
-    add_branch_index = 0
 
     if side=='R':
         DEGREE_OF_TURN = 90
-        add_branch_index += 1
-        go(TURN_OUT, TURN_IN)   # inner slower
+        branch_index += 1
+        go(TURN_IN, TURN_OUT)   # inner slower
         turn_sleep(DEGREE_OF_TURN, (TURN_OUT - TURN_IN))
         print('R')
 
     elif side=='L':
         DEGREE_OF_TURN = 90     
-        add_branch_index += 1
-        go(TURN_IN, TURN_OUT)
+        branch_index += 1
+        go(TURN_OUT, TURN_IN)
         turn_sleep(DEGREE_OF_TURN, (TURN_OUT - TURN_IN))
         print('L')
     
     elif side == 'B': 
         DEGREE_OF_TURN = 180
-        add_branch_index += 1
+        branch_index += 1
         go(TURN_IN, TURN_OUT)
         turn_sleep(DEGREE_OF_TURN, (TURN_OUT - TURN_IN))
         print('B')
 
     elif side == 'F':
-        add_branch_index += 1        # consume the 'F'
+        branch_index += 1        # consume the 'F'
         go(100,100)
         sleep_ms(200)  # move forward length of line
         print('F')
 
 
     else:
-        add_branch_index += 1        # consume the 'F'
+        branch_index += 1        # consume the 'F'
         mL.stop(); mR.stop()
         sleep_ms(DT_MS)
         print('X(F)')
-    return add_branch_index
 
 
 
@@ -121,27 +116,22 @@ def turn_sleep(deg, speed):
     time_ms = (distance / (speed * 0.25)) * 1000  # time in ms
     sleep_ms(int(time_ms))
 
-def spin_sleep(deg, speed):
-    distance = (deg / 180) * 3.14 * RADIUS_OF_TURN  # distance to travel
-    time_ms = (distance*0.65 / (speed * 0.25)) * 1000  # time in ms
-    sleep_ms(int(time_ms))
-
 
 def centered(c):   return c == 0b0110
 def slight_left(c):  return c == 0b0100
 def slight_right(c): return c == 0b0010
 
-# def skip_loading_bay():
-#     complete_route(['F','F','F','F','F','F','F','F'])
+def skip_loading_bay():
+    complete_route(['F','F','F','F','F','F','F','F'])
 
 
 
 def path_to_route(path):
-    global finish_heading
+    global current_heading
     route = []
     prev = path[0]
     curr = path[1]
-    for edge in map.DIRECTED_EDGES:
+    for edge in DIRECTED_EDGES:
         if edge.src == prev and edge.dst == curr:
             if edge.start_heading - current_heading == 1 or edge.start_heading - current_heading == -3:
                 route.append('R')
@@ -162,15 +152,14 @@ def path_to_route(path):
         else:
             next = None
         # find the directed edge that matches prev -> curr
-        for edge in map.DIRECTED_EDGES:
+        for edge in DIRECTED_EDGES:
+            if edge.src in [B_DOWN_BEG, B_DOWN_END, A_DOWN_BEG, A_DOWN_END, B_UP_BEG, B_UP_END, A_UP_BEG, A_UP_END] and edge.dst in [B_DOWN_BEG, B_DOWN_END, A_DOWN_BEG, A_DOWN_END, B_UP_BEG, B_UP_END, A_UP_BEG, A_UP_END]:
+                for i in range(8):
+                    route.append('F')
             if edge.src == prev and edge.dst == curr:
-                if edge.src in [V.B_DOWN_BEG, V.B_DOWN_END, V.A_DOWN_BEG, V.A_DOWN_END, V.B_UP_BEG, V.B_UP_END, V.A_UP_BEG, V.A_UP_END] and edge.dst in [V.B_DOWN_BEG, V.B_DOWN_END, V.A_DOWN_BEG, V.A_DOWN_END, V.B_UP_BEG, V.B_UP_END, V.A_UP_BEG, V.A_UP_END]:
-                    for i in range(7):
-                        route.append('F')
-                else:
-                    route.append(edge.turn)
-                    break
-    finish_heading = edge.end_heading  
+                route.append(edge.turn)
+                break
+        current_heading = edge.end_heading  
         
     return route
 
@@ -184,27 +173,28 @@ def complete_route(branch_route):
 
     if branch_route[branch_index] == 'R':
         spin_right(BASE)
-        spin_sleep(90, BASE)
-    elif branch_route[branch_index] == 'L':
+        turn_sleep(90, BASE)
+    elif branch_route[branch_index:] == 'L':
         spin_left(BASE)
-        spin_sleep(90, BASE)
-    elif branch_route[branch_index] == 'B':
+        turn_sleep(90, BASE)
+    elif branch_route[branch_index:] == 'B':
         spin_right(BASE)
-        spin_sleep(180, BASE)
-    branch_index = 1
+        turn_sleep(180, BASE)
+    branch_index += 1
 
     turning = None
     fl_cnt = fr_cnt = 0
     stable = 0
     t0 = 0
-    while branch_index < len(branch_route) or not centered(read_code()):
-        print(current_heading)
+    while branch_index < len(branch_route):
         c = read_code()
         #print("Code:",bin(c))
         FL = (c>>3)&1;  FR = c&1
         mid = (c>>1)&0b11  # inner pair
                 # If all four see white: follow the next route directive
-        #print(branch_index)
+
+        go(100, 100)
+        sleep(2)
         
         if c == 0b1111:
             # if we ran out of directives, default to 'F'
@@ -213,28 +203,28 @@ def complete_route(branch_route):
             if action == 'L':
                 turning = 'L'
                 t0 = ticks_ms()
-                branch_index += arc('L')                 # branch_index += arc() will consume this route entry
+                arc('L')                 # arc() will consume this route entry
                 sleep_ms(DT_MS)
                 continue
 
             elif action == 'R':
                 turning = 'R'
                 t0 = ticks_ms()
-                branch_index += arc('R')                 # branch_index += arc() will consume this route entry
+                arc('R')                 # arc() will consume this route entry
                 sleep_ms(DT_MS)
                 continue
 
             elif action == 'B':
                 turning = 'B'
                 t0 = ticks_ms()
-                branch_index += arc('B')                 # branch_index += arc() will consume this route entry
+                arc('B')                 # arc() will consume this route entry
                 sleep_ms(DT_MS)
                 continue
 
             else:  # 'F' -> skip this node
                 turning = 'F'
                 t0 = ticks_ms()
-                branch_index += arc('F')                 # branch_index += arc() will consume this route entry
+                arc('F')                 # arc() will consume this route entry
                 sleep_ms(DT_MS)
                 continue
         
@@ -245,7 +235,7 @@ def complete_route(branch_route):
             if action == 'L':
                 turning = 'L'
                 t0 = ticks_ms()
-                branch_index += arc('L')                 # branch_index += arc() will consume this route entry
+                arc('L')                 # arc() will consume this route entry
                 sleep_ms(DT_MS)
                 continue
 
@@ -255,7 +245,7 @@ def complete_route(branch_route):
             else:  # 'F' -> skip this node
                 turning = 'F'
                 t0 = ticks_ms()
-                branch_index += arc('F')                 # branch_index += arc() will consume this route entry
+                arc('F')                 # arc() will consume this route entry
                 sleep_ms(DT_MS)
                 continue
         
@@ -269,14 +259,14 @@ def complete_route(branch_route):
             elif action == 'R':
                 turning = 'R'
                 t0 = ticks_ms()
-                branch_index += arc('R')                 # branch_index += arc() will consume this route entry
+                arc('R')                 # arc() will consume this route entry
                 sleep_ms(DT_MS)
                 continue
 
             else:  # 'F' -> skip this node
                 turning = 'F'
                 t0 = ticks_ms()
-                branch_index += arc('F')                 # branch_index += arc() will consume this route entry
+                arc('F')                 # arc() will consume this route entry
                 sleep_ms(DT_MS)
                 continue
 
@@ -290,7 +280,7 @@ def complete_route(branch_route):
                 stable = 0
             if stable >= STABLE or ticks_diff(ticks_ms(), t0) > MAX_TURN_MS:
                 turning = None; stable = 0; go(BASE, BASE); sleep_ms(DT_MS); continue
-            branch_index += arc(turning); sleep_ms(DT_MS); 
+            arc(turning); sleep_ms(DT_MS); 
         # completely useless code, delete after testing
 
 
@@ -299,7 +289,7 @@ def complete_route(branch_route):
         # if FL and not FR and mid == 0b11:
         #     fl_cnt += 1; fr_cnt = 0
         #     if fl_cnt >= DEBOUNCE:
-        #         turning = 'L'; t0 = ticks_ms(); branch_index += arc('L'); sleep_ms(DT_MS); continue
+        #         turning = 'L'; t0 = ticks_ms(); arc('L'); sleep_ms(DT_MS); continue
         # elif FR and not FL and mid == 0b11:
         #     fr_cnt += 1; fl_cnt = 0
         #     if fr_cnt >= DEBOUNCE:
@@ -320,62 +310,36 @@ def complete_route(branch_route):
         elif c in (0b0011, 0b0001): # far to right
             go(BASE+HARD, BASE-HARD)
         else:
-            # all black or unrecognized -> go foward
-            go(BASE, BASE)
-        
+            # unknown/lost -> gentle bias to move forward
+            go(BASE, BASE-10)
 
         sleep_ms(DT_MS)
-    go(BASE, BASE)
-    sleep_ms(200)
-    current_heading = finish_heading
 
 
-def go_to(finish_vertex):
-    global current_vertex
-
-    graph = map.GRAPH
-    current_path = map.shortest_path(graph, current_vertex, finish_vertex)
-    branch_route = path_to_route(current_path)
-    complete_route(branch_route)
-    current_vertex = finish_vertex
-
-    print("Path:", current_path)
-    print("Route:", branch_route)
 
 
-loading_bays = [V.B_DOWN_BEG, V.B_UP_BEG, V.A_UP_BEG, V.B_DOWN_BEG]  # list of loading bay vertices
-boxes_delivered = 0
-number_of_bay = 0
-last_checked_bay = loading_bays[0]
 
-def color_to_vertex(color: str) -> V:
-    try:
-        return V[color.upper()]   # uses enum name lookup
-    except KeyError:
-        raise ValueError(f"Unknown color: {color!r}")
+
 
 
 def main():
     global current_vertex
-    global last_checked_bay
-    global boxes_delivered
-    global number_of_bay
-
-    while boxes_delivered < 4:
-
-        go_to(last_checked_bay) 
-        # we go to last loading bay spot and check if there are any boxes in there. If there are, we pick them up and transport them.
-        # if check_for_boxes() is not None: #if we found any boxes there
-        #   pick_up_boxes()
-        #   color = check_for_boxes()  # get the color of the box
-        #   delivery_area = color_to_vertex(color)  # map color to vertex
-        #   go_to(delivery_area)  # go to delivery area
-        #   boxes_delivered += 1
-        # else:
-        #   number_of_bay = (number_of_bay + 1) % len(loading_bays)
-
-    go_to(V.START)
-    go(0,0)
+    global finish_vertex
+    graph = map.GRAPH
+    finish_vertex = V.GREEN
+    current_path = map.shortest_path(graph, current_vertex, finish_vertex)
+    print("Path:", current_path)
+    branch_route = path_to_branch_route(graph, path)
+    print("Route:", branch_route)
+    complete_route(branch_route)
+    current_vertex = finish_vertex
+    finish_vertex = V.START
+    current_path = map.shortest_path(graph, current_vertex, finish_vertex)
+    print("Path:", current_path)
+    branch_route = path_to_branch_route(graph, path)
+    print("Route:", branch_route)
+    complete_route(branch_route)
+    current_vertex = finish_vertex
     
 
 main()

@@ -154,12 +154,12 @@ DIRECTED_EDGES = [
     DirectedEdge(src=V.DOWN_RIGHT , dst=V.DOWN_LEFT  , start_heading=3, turn='L', end_heading=2, cost=8.0),
     DirectedEdge(src=V.DOWN_RIGHT , dst=V.RAMP       , start_heading=3, turn='F', end_heading=3, cost=8.0),
 
-    DirectedEdge(src=V.A_UP_END   , dst=V.UP_LEFT    , start_heading=0, turn='R', end_heading=1, cost=3.0),
-    DirectedEdge(src=V.A_UP_END   , dst=V.A_UP_BEG   , start_heading=0, turn='F', end_heading=0, cost=6.0), 
+    DirectedEdge(src=V.A_UP_BEG   , dst=V.UP_LEFT    , start_heading=0, turn='R', end_heading=1, cost=3.0),
+    DirectedEdge(src=V.A_UP_BEG   , dst=V.A_UP_END   , start_heading=0, turn='F', end_heading=0, cost=6.0), 
     
-    DirectedEdge(src=V.A_UP_BEG   , dst=V.A_UP_END   , start_heading=2, turn='F', end_heading=2, cost=6.0),
+    DirectedEdge(src=V.A_UP_END   , dst=V.A_UP_BEG   , start_heading=2, turn='F', end_heading=2, cost=6.0),
 
-    DirectedEdge(src=V.UP_LEFT    , dst=V.A_UP_END   , start_heading=3, turn='R', end_heading=0, cost=3.0),
+    DirectedEdge(src=V.UP_LEFT    , dst=V.A_UP_BEG   , start_heading=3, turn='R', end_heading=0, cost=3.0),
     DirectedEdge(src=V.UP_LEFT    , dst=V.RAMP       , start_heading=1, turn='L', end_heading=0, cost=5.0),
     DirectedEdge(src=V.UP_LEFT    , dst=V.UP_RIGHT   , start_heading=1, turn='F', end_heading=1, cost=2.0),
 
