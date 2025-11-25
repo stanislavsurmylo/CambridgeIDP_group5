@@ -119,6 +119,29 @@ def arc(side):
         print('X(F)')
     return add_branch_index
 
+def shift_with_correction(time):
+    t0 = ticks_ms()
+    while ticks_diff(ticks_ms(), t0) < time:
+        c = read_code()
+        if centered(c):
+            go(BASE, BASE)
+        elif slight_left:           # left inner only -> steer LEFT
+            go(BASE-DELTA, BASE+DELTA)
+        elif slight_right:           # right inner only -> steer RIGHT
+            go(BASE+DELTA, BASE-DELTA)
+        elif c in (0b1100, 0b1000): # far to left
+            go(BASE-HARD, BASE+HARD)
+        elif c in (0b0011, 0b0001): # far to right
+            go(BASE+HARD, BASE-HARD)
+        else:
+            # unknown/lost -> gentle bias to move forward
+            go(BASE, BASE-10)
+
+def go_spin(deg):
+    shift_with_correction(200)  # move forward length of line
+    spin_left(90)   # inner slower
+    spin_sleep(deg, BASE)
+
 
 
 def turn_sleep(deg, speed):
@@ -128,7 +151,7 @@ def turn_sleep(deg, speed):
 
 def spin_sleep(deg, speed):
     distance = (deg / 180) * 3.14 * RADIUS_OF_TURN  # distance to travel
-    time_ms = (distance*0.65 / (speed * 0.25)) * 1000  # time in ms
+    time_ms = (distance*0.65 / (speed * 0.25)) * 1000   # time in ms
     sleep_ms(int(time_ms))
 
 
@@ -180,10 +203,18 @@ def path_to_route(path):
     return route
 
 
-def seek_and_find():
-    box_not_found = True
-    while box_not_found:
-        print(current_heading)
+def seek_and_find(LoadingBay):
+    global current_heading
+    turn_counter = 0
+    box_found = False
+    pickup_completed = False
+    for edge in map.DIRECTED_EDGES:
+        if edge.src == LoadingBay and edge.dst in [V.B_DOWN_END, V.A_DOWN_END, V.B_UP_END, V.A_UP_END]:
+            if edge.start_heading - current_heading == 2 or edge.start_heading - current_heading == -2:
+                spin_right(BASE)
+                spin_sleep(180, BASE)
+    
+    while not pickup_completed:
         c = read_code()
         #print("Code:",bin(c))
         FL = (c>>3)&1;  FR = c&1
@@ -191,18 +222,31 @@ def seek_and_find():
                 # If all four see white: follow the next route directive
         #print(branch_index)
         
-        if c == 0b1110:
+        if c == 0b1110 and not box_found:
+            turn_counter += 1
             # if we ran out of directives, default to 'F'
-            sensor_distance = vl5310x_read_distance(setup_sensor1)
-            print("Distance:", sensor_distance)
-            tick1 = ticks_ms()
-            if sensor_distance < TARGET_DISTANCE and tick1 - tick0 > 500:
-                box_not_found = False
-                go(0,0)
-                break
+            sensor_distance1 = vl5310x_read_distance(setup_sensor1)
+            print("Distance:", sensor_distance1)
+            if sensor_distance1 < TARGET_DISTANCE:
+                tick1 = ticks_ms()
+                if tick1 - tick0 > 50:
+                    box_found = True
+                    continue
                 
         else:  # 'F' -> skip this node
             tick0 = ticks_ms()
+
+        # if c == 0b1110 and box_found:
+        #     x += arc('L')                 # branch_index += arc() will consume this route entry
+        #     sleep_ms(DT_MS)
+        #     continue
+
+        if c == 0b1110 and box_found:
+            x += go_spin(90)                 # branch_index += arc() will consume this route entry
+            sleep_ms(DT_MS)
+            continue
+
+        
 
                 
 

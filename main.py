@@ -123,7 +123,7 @@ def turn_sleep(deg, speed):
 
 def spin_sleep(deg, speed):
     distance = (deg / 180) * 3.14 * RADIUS_OF_TURN  # distance to travel
-    time_ms = (distance*0.65 / (speed * 0.25)) * 1000  # time in ms
+    time_ms = (distance*0.65 / (speed * 0.25)) * 1000 * 0.9  # time in ms
     sleep_ms(int(time_ms))
 
 
