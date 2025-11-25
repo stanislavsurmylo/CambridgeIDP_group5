@@ -318,16 +318,14 @@ def complete_route(branch_route):
         elif c in (0b0011, 0b0001): # far to right
             go(BASE+HARD, BASE-HARD)
         else:
-            # unknown/lost -> gentle bias to move forward
-            go(BASE, BASE-10)
+            # all black or unrecognized -> go foward
+            go(BASE, BASE)
         
 
         sleep_ms(DT_MS)
     go(BASE, BASE)
     sleep_ms(200)
     current_heading = finish_heading
-
-
 
 
 def go_to(finish_vertex):
@@ -343,11 +341,16 @@ def go_to(finish_vertex):
     print("Route:", branch_route)
 
 
-loading_bays = [V.A_DOWN_END, V.A_UP_END, V.B_UP_BEG, V.B_DOWN_END]
+loading_bays = [V.B_DOWN_BEG, V.B_UP_BEG, V.A_UP_BEG, V.B_DOWN_BEG]  # list of loading bay vertices
 boxes_delivered = 0
 number_of_bay = 0
 last_checked_bay = loading_bays[0]
 
+def color_to_vertex(color: str) -> V:
+    try:
+        return V[color.upper()]   # uses enum name lookup
+    except KeyError:
+        raise ValueError(f"Unknown color: {color!r}")
 
 def main():
     global current_vertex
@@ -361,9 +364,9 @@ def main():
         # we go to last loading bay spot and check if there are any boxes in there. If there are, we pick them up and transport them.
         # if check_for_boxes() is not None: #if we found any boxes there
         #   pick_up_boxes()
-
-        #   V.DELIVERY_AREA = depends on color
-        #   go_to(V.DELIVERY_AREA)
+        #   color = check_for_boxes()  # get the color of the box
+        #   delivery_area = color_to_vertex(color)  # map color to vertex
+        #   go_to(delivery_area)  # go to delivery area
         #   boxes_delivered += 1
         # else:
         #   number_of_bay = (number_of_bay + 1) % len(loading_bays)
