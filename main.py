@@ -355,6 +355,10 @@ def color_to_vertex(color: str) -> V:
         raise ValueError(f"Unknown color: {color!r}")
 
 
+from linear_actuator import unload_robot
+from pickup import seek_and_find
+
+
 def main():
     global current_vertex
     global last_checked_bay
@@ -363,16 +367,17 @@ def main():
 
     while boxes_delivered < 4:
 
-        # go_to(last_checked_bay) 
-        # # we go to last loading bay spot and check if there are any boxes in there. If there are, we pick them up and transport them.
-        # if seek_and_find(last_checked_bay) is not None: #if we found any boxes there
-        #   color = seek_and_find(last_checked_bay)  # get the color of the box
-        #   delivery_area = color_to_vertex(color)  # map color to vertex
-        #   go_to(delivery_area)  # go to delivery area
-        #   boxes_delivered += 1 # increment boxes delivered
-        # else:
-        #   number_of_bay = (number_of_bay + 1) % len(loading_bays) # set target to next bay
-        #   unload_robot() # unload any boxes we have
+        go_to(last_checked_bay) 
+        # we go to last loading bay spot and check if there are any boxes in there. If there are, we pick them up and transport them.
+        if seek_and_find(last_checked_bay) is not None: #if we found any boxes there
+            color = seek_and_find(last_checked_bay)  # get the color of the box
+            delivery_area = color_to_vertex(color)  # map color to vertex
+            go_to(delivery_area)  # go to delivery area
+            boxes_delivered += 1 # increment boxes delivered
+            unload_robot() # unload any boxes we have
+        else:
+            number_of_bay = (number_of_bay + 1) % len(loading_bays) # set target to next bay
+
 
     go_to(V.START)
     go(0,0)
