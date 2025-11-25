@@ -3,6 +3,10 @@ from machine import Pin, PWM
 from time import sleep_ms, ticks_ms, ticks_diff
 import map
 from map import V
+from vl53l0x_distance import setup_sensor, vl5310x_read_distance
+
+setup_sensor1 = setup_sensor()
+
 
 # ----- SENSORS (left->right). Swap sFL,sFR wires here if needed -----
 S_FL = Pin(19, Pin.IN)   # front-left  (outer)
@@ -46,7 +50,8 @@ TURN_OUT = 100 # arc outer wheel speed
 TURN_IN  = 0 # arc inner wheel speed
 DEBOUNCE = 3  # front trigger must persist N cycles
 STABLE   = 1  # need N centered readings to finish a turn
-MAX_TURN_MS = 10                                                 
+MAX_TURN_MS = 10   
+TARGET_DISTANCE = 250  # target distance in mm                                              
 
 
 DT_MS = 20
@@ -174,6 +179,64 @@ def path_to_route(path):
         
     return route
 
+
+def seek_and_find():
+    box_not_found = True
+    while box_not_found:
+        print(current_heading)
+        c = read_code()
+        #print("Code:",bin(c))
+        FL = (c>>3)&1;  FR = c&1
+        mid = (c>>1)&0b11  # inner pair
+                # If all four see white: follow the next route directive
+        #print(branch_index)
+        
+        if c == 0b1110:
+            # if we ran out of directives, default to 'F'
+            sensor_distance = vl5310x_read_distance(setup_sensor1)
+            print("Distance:", sensor_distance)
+            tick1 = ticks_ms()
+            if sensor_distance < TARGET_DISTANCE and tick1 - tick0 > 500:
+                box_not_found = False
+                go(0,0)
+                break
+                
+        else:  # 'F' -> skip this node
+            tick0 = ticks_ms()
+
+                
+
+            # if current_path[branch_index] in [V.B_UP_BEG, V.A_UP_END] and current_path[branch_index - 1] in [V.UP_LEFT, V.UP_RIGHT]:
+            #     go_back(BASE,BASE)
+            #     sleep_ms(150)
+            # # in case there is not enough space after turn
+        # ---- detect a branch (outer sensor on one side, inner pair mostly white) ----
+        # if FL and not FR and mid == 0b11:
+        #     fl_cnt += 1; fr_cnt = 0
+        #     if fl_cnt >= DEBOUNCE:
+        #         turning = 'L'; t0 = ticks_ms(); branch_index += arc('L'); sleep_ms(DT_MS); continue
+        # elif FR and not FL and mid == 0b11:
+        #     fr_cnt += 1; fl_cnt = 0
+        #     if fr_cnt >= DEBOUNCE:
+        #         turning = 'R'; t0 = ticks_ms(); arc('R'); sleep_ms(DT_MS); continue
+        # else:
+        #     fl_cnt = fr_cnt = 0
+
+
+
+        if centered(c):
+            go(BASE, BASE)
+        elif c == 0b0100:           # left inner only -> steer LEFT
+            go(BASE-DELTA, BASE+DELTA)
+        elif c == 0b0010:           # right inner only -> steer RIGHT
+            go(BASE+DELTA, BASE-DELTA)
+        elif c in (0b1100, 0b1000): # far to left
+            go(BASE-HARD, BASE+HARD)
+        elif c in (0b0011, 0b0001): # far to right
+            go(BASE+HARD, BASE-HARD)
+        else:
+            # unknown/lost -> gentle bias to move forward
+            go(BASE, BASE-10)
 
 
 
