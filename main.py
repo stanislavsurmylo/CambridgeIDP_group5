@@ -48,7 +48,9 @@ TURN_IN  = 0 # arc inner wheel speed
 DEBOUNCE = 3  # front trigger must persist N cycles
 STABLE   = 1  # need N centered readings to finish a turn
 MAX_TURN_MS = 10                                                 
-
+TARGET_DISTANCE = 250  # target distance in mm   
+COLOUR_DETECTION_DISTANCE = 50  # distance to detect color in mm
+PICKUP_DISTANCE = 10  # distance to pick up box in mm
 
 DT_MS = 20
 
@@ -74,6 +76,25 @@ def read_code():
 def go(vL, vR): mL.fwd(vL); mR.fwd(vR)
 def spin_left(v): mL.bwd(v); mR.fwd(v)
 def spin_right(v): mL.fwd(v); mR.bwd(v)
+
+def shift_with_correction(time):
+    t0 = ticks_ms()
+    while ticks_diff(ticks_ms(), t0) < time:
+        c = read_code()
+        if centered(c):
+            go(BASE, BASE)
+        elif slight_left:           # left inner only -> steer LEFT
+            go(BASE-DELTA, BASE+DELTA)
+        elif slight_right:           # right inner only -> steer RIGHT
+            go(BASE+DELTA, BASE-DELTA)
+        elif c in (0b1100, 0b1000): # far to left
+            go(BASE-HARD, BASE+HARD)
+        elif c in (0b0011, 0b0001): # far to right
+            go(BASE+HARD, BASE-HARD)
+        else:
+            # unknown/lost -> gentle bias to move forward
+            go(BASE, BASE-10)
+
 
 def arc(side):
     global current_heading
@@ -113,6 +134,11 @@ def arc(side):
         sleep_ms(DT_MS)
         print('X(F)')
     return add_branch_index
+
+def go_spin(deg):
+    shift_with_correction(200)  # move forward length of line
+    spin_left(BASE)   # inner slower
+    spin_sleep(deg, BASE)
 
 
 

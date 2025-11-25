@@ -7,6 +7,11 @@ PIN_SDA = 8     # GP8
 PIN_SCL = 9     # GP9
 SAMPLE_INTERVAL_SECONDS = 0.5
 
+def tmf8701_read_distance(sensor):
+    pass
+
+def setup_sensor():
+    pass
 
 def main():
     i2c = I2C(I2C_ID, sda=Pin(PIN_SDA), scl=Pin(PIN_SCL))

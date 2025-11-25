@@ -4,6 +4,7 @@ from time import sleep_ms, ticks_ms, ticks_diff
 import map
 from map import V
 from vl53l0x_distance import setup_sensor, vl5310x_read_distance
+from tmf8701_distance import setup_sensor, tmf8701_read_distance
 
 setup_sensor1 = setup_sensor()
 
@@ -139,7 +140,7 @@ def shift_with_correction(time):
 
 def go_spin(deg):
     shift_with_correction(200)  # move forward length of line
-    spin_left(90)   # inner slower
+    spin_left(BASE)   # inner slower
     spin_sleep(deg, BASE)
 
 
@@ -205,6 +206,7 @@ def path_to_route(path):
 
 def seek_and_find(LoadingBay):
     global current_heading
+    box_approached = 0
     turn_counter = 0
     box_found = False
     pickup_completed = False
@@ -242,31 +244,21 @@ def seek_and_find(LoadingBay):
         #     continue
 
         if c == 0b1110 and box_found:
-            x += go_spin(90)                 # branch_index += arc() will consume this route entry
+            go_spin(90)                 # branch_index += arc() will consume this route entry
             sleep_ms(DT_MS)
+            box_approached = 1
             continue
 
-        
-
-                
-
-            # if current_path[branch_index] in [V.B_UP_BEG, V.A_UP_END] and current_path[branch_index - 1] in [V.UP_LEFT, V.UP_RIGHT]:
-            #     go_back(BASE,BASE)
-            #     sleep_ms(150)
-            # # in case there is not enough space after turn
-        # ---- detect a branch (outer sensor on one side, inner pair mostly white) ----
-        # if FL and not FR and mid == 0b11:
-        #     fl_cnt += 1; fr_cnt = 0
-        #     if fl_cnt >= DEBOUNCE:
-        #         turning = 'L'; t0 = ticks_ms(); branch_index += arc('L'); sleep_ms(DT_MS); continue
-        # elif FR and not FL and mid == 0b11:
-        #     fr_cnt += 1; fl_cnt = 0
-        #     if fr_cnt >= DEBOUNCE:
-        #         turning = 'R'; t0 = ticks_ms(); arc('R'); sleep_ms(DT_MS); continue
-        # else:
-        #     fl_cnt = fr_cnt = 0
-
-
+        if box_approached == 1:
+            # if we ran out of directives, default to 'F'
+            sensor_distance2 = vl5310x_read_distance(setup_sensor1)
+            print("Distance:", sensor_distance1)
+            if sensor_distance1 < TARGET_DISTANCE:
+                tick1 = ticks_ms()
+                if tick1 - tick0 > 50:
+                    box_found = True
+                    continue
+            
 
         if centered(c):
             go(BASE, BASE)
