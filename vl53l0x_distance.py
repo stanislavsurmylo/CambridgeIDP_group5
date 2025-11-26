@@ -7,14 +7,30 @@ PIN_SDA = 8
 SAMPLE_INTERVAL_SECONDS = 0.5
 
 
+# --- import the driver once, and show a clear error if something is wrong ---
+try:
+    import VL53L0X as vl
+except ImportError as e:
+    # This means the file VL53L0X.py is not found on the Pico or cannot be imported
+    raise RuntimeError(
+        "Cannot import VL53L0X module. "
+        "Check that 'VL53L0X.py' is copied to the Pico (/, or /lib) "
+        "and the name/case matches exactly."
+    ) from e
+
+# figure out how the class is named inside the driver
+VLClass = getattr(vl, "VL53L0Xclass", None) or getattr(vl, "VL53L0X", None)
+if VLClass is None:
+    # Module is there, but the expected class is missing
+    raise RuntimeError(
+        "VL53L0X driver module imported, but neither 'VL53L0Xclass' nor "
+        "'VL53L0X' is defined inside it."
+    )
+
 def setup_sensor():
     i2c_bus = I2C(id=I2C_ID, sda=Pin(PIN_SDA), scl=Pin(PIN_SCL))
 
-    try:
-        from libs.vl53l0x import VL53L0X
-    except ImportError as e:
-        raise RuntimeError("VL53L0X driver not found") from e
-    sensor = VL53L0X(i2c_bus)
+    sensor = VL53L0Xclass(i2c_bus)
     #Higher numbers = longer pulse → more light → potentially more range, 
     #but slower measurement and higher power.
     #Pre-range 2,14,16,18; Final range 1, 12, 14, 16

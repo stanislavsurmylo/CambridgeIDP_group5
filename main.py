@@ -3,6 +3,7 @@ from machine import Pin, PWM
 from time import sleep_ms, ticks_ms, ticks_diff
 import map
 from map import V
+import vl53l0x_distance
 from vl53l0x_distance import setup_sensor, vl5310x_read_distance
 from libs.tmf8701 import DFRobot_TMF8701
 # import loading_pipeline
@@ -243,7 +244,7 @@ def path_to_route(path):
 def seek_and_find(LoadingBay):
     global current_heading
     global current_vertex
-    colour = 'red' # default color if none found
+    colour = None 
     loading_stage = 0
     turn_counter_on = True
     turn_counter = 0
@@ -275,7 +276,6 @@ def seek_and_find(LoadingBay):
                     continue
                 
         elif loading_stage == 0:  
-            tick0 = ticks_ms()
             turn_counter_on = True
 
         # if c == 0b1110 and box_found:
