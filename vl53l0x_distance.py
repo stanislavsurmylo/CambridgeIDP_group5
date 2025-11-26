@@ -6,35 +6,40 @@ PIN_SCL = 9
 PIN_SDA = 8          
 SAMPLE_INTERVAL_SECONDS = 0.5
 
-
-# --- import the driver once, and show a clear error if something is wrong ---
 try:
-    import VL53L0X as vl
+    import VL53L0X  # this imports the file VL53L0X.py as a module
 except ImportError as e:
-    # This means the file VL53L0X.py is not found on the Pico or cannot be imported
     raise RuntimeError(
-        "Cannot import VL53L0X module. "
-        "Check that 'VL53L0X.py' is copied to the Pico (/, or /lib) "
-        "and the name/case matches exactly."
+        "VL53L0X driver not found. Make sure 'VL53L0X.py' is on the Pico."
     ) from e
+# --- import the driver once, and show a clear error if something is wrong ---
+# try:
+#     import VL53L0X as vl
+# except ImportError as e:
+#     # This means the file VL53L0X.py is not found on the Pico or cannot be imported
+#     raise RuntimeError(
+#         "Cannot import VL53L0X module. "
+#         "Check that 'VL53L0X.py' is copied to the Pico (/, or /lib) "
+#         "and the name/case matches exactly."
+#     ) from e
 
-# figure out how the class is named inside the driver
-VLClass = getattr(vl, "VL53L0Xclass", None) or getattr(vl, "VL53L0X", None)
-if VLClass is None:
-    # Module is there, but the expected class is missing
-    raise RuntimeError(
-        "VL53L0X driver module imported, but neither 'VL53L0Xclass' nor "
-        "'VL53L0X' is defined inside it."
-    )
+# # figure out how the class is named inside the driver
+# VLClass = getattr(vl, "VL53L0Xclass", None) or getattr(vl, "VL53L0X", None)
+# if VLClass is None:
+#     # Module is there, but the expected class is missing
+#     raise RuntimeError(
+#         "VL53L0X driver mod   ule imported, but neither 'VL53L0Xclass' nor "
+#         "'VL53L0X' is defined inside it."
+#     )
 
 def setup_sensor():
     i2c_bus = I2C(id=I2C_ID, sda=Pin(PIN_SDA), scl=Pin(PIN_SCL))
 
-    sensor = VL53L0Xclass(i2c_bus)
-    #Higher numbers = longer pulse → more light → potentially more range, 
-    #but slower measurement and higher power.
-    #Pre-range 2,14,16,18; Final range 1, 12, 14, 16
-    sensor.set_Vcsel_pulse_period(sensor.vcsel_period_type[0], 18) 
+    # class lives inside the module as VL53L0X.VL53L0Xclass
+    sensor = VL53L0X.VL53L0Xclass(i2c_bus)
+
+    # Higher numbers = longer pulse → more light → potentially more range
+    sensor.set_Vcsel_pulse_period(sensor.vcsel_period_type[0], 18)
     sensor.set_Vcsel_pulse_period(sensor.vcsel_period_type[1], 14)
 
     return sensor
