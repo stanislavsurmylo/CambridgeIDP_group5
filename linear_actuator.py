@@ -25,7 +25,7 @@ class Actuator:
 
 DIR_PIN = 3
 PWM_PIN = 2
-TEST_DURATION = 1.0  # 1 second for testing
+TEST_DURATION = 5  # 1 second for testing
 
 def unload_robot():
 
@@ -33,13 +33,13 @@ def unload_robot():
     actuator = Actuator(DIR_PIN, PWM_PIN)
     
     # Test retract
+    print("Retracting for {} seconds...".format(TEST_DURATION))
     actuator.retract(speed=100)
-    sleep(5)
+    sleep(TEST_DURATION)
     actuator.stop()
-    sleep(2)  # Pause so you can measure
-    
     print("Unloading complete")
+    sleep(2)  # Pause so you can measure
 
 
 if __name__ == "__main__":
-    test_actuator()
+    unload_robot()

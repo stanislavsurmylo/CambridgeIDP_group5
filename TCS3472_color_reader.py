@@ -1,13 +1,13 @@
-from machine import I2C, Pin, UART
+from machine import I2C, Pin
 from utime import sleep
-
 
 I2C_ID = 0
 PIN_SDA = 8   # GP8 (SDA)
 PIN_SCL = 9   # GP9 (SCL)
-POWER_PIN = 0 # GPIO controlling sensor power (via transistor/FET)
-ON_TIME_SECONDS = 1
-OFF_TIME_SECONDS = 1
+POWER_PIN = 0  # GPIO used to gate sensor power (wire through transistor/MOSFET)
+POWER_STABILIZE_MS = 50
+INTEGRATION_TIME_MS = 760
+OFF_TIME_SECONDS = 1.0
 
 
 def setup_sensor():
@@ -16,8 +16,9 @@ def setup_sensor():
     try:
         from libs.tcs3472 import tcs3472
     except ImportError as e:
-        raise RuntimeError ("TCS3472 driver not found") from e
+        raise RuntimeError("TCS3472 driver not found") from e
     return tcs3472(i2c_bus)
+
 
 def detect_color(rgb, light):
     r, g, b = rgb
@@ -39,6 +40,7 @@ def detect_color(rgb, light):
 
     return "UNKNOWN"
 
+
 def main():
     power_ctrl = Pin(POWER_PIN, Pin.OUT, value=0)
 
@@ -46,14 +48,13 @@ def main():
         while True:
             # Power ON
             power_ctrl.value(1)
-            sleep(0.05)  # allow sensor to power up
+            sleep(POWER_STABILIZE_MS / 1000)
             sensor = setup_sensor()
-            sleep(0.76) # integration time for sensor reading
+            sleep(INTEGRATION_TIME_MS / 1000)
             light = sensor.light()
             rgb = sensor.rgb()
             color = detect_color(rgb, light)
             print("ON  -> Light:", light, "RGB:", rgb, "Color:", color)
-            
 
             # Power OFF
             power_ctrl.value(0)
@@ -67,7 +68,6 @@ def main():
         print("Sensor error:", e)
         power_ctrl.value(0)
 
+
 if __name__ == "__main__":
     main()
-
-
