@@ -4,7 +4,7 @@ from utime import sleep
 from libs.tcs3472 import tcs3472
 from linear_actuator import Actuator
 from libs.tmf8701 import DFRobot_TMF8701
-from libs.vl53l0x import VL53L0X
+from libs.VL53L0X import VL53L0X
 
 # Zone configuration: "zone_down" or "zone_up"
 LOADING_ZONE = 1  # zone down = 1, zone up = 2

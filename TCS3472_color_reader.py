@@ -48,9 +48,9 @@ def main():
         while True:
             # Power ON
             power_ctrl.value(1)
-            sleep(POWER_STABILIZE_MS / 1000)
+            sleep(1)
             sensor = setup_sensor()
-            sleep(INTEGRATION_TIME_MS / 1000)
+            sleep(2)
             light = sensor.light()
             rgb = sensor.rgb()
             color = detect_color(rgb, light)

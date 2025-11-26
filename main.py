@@ -23,21 +23,23 @@ PIN_SDA = 8     # GP8
 PIN_SCL = 9     # GP9
 SAMPLE_INTERVAL_SECONDS = 0.5
 
-def setup_sensor2():
+def setup_sensor_tmf8701():
     i2c = I2C(I2C_ID, sda=Pin(PIN_SDA), scl=Pin(PIN_SCL))
     sensor = DFRobot_TMF8701(i2c)
-
     if sensor.begin() != 0:
         raise RuntimeError("TMF8701 initialization failed")
-
-    if not sensor.start_measurement(sensor.eMODE_CALIB, sensor.eDISTANCE):
+    if not sensor.start_measurement(sensor.eMODE_NO_CALIB, sensor.eCOMBINE):
         raise RuntimeError("TMF8701 failed to start measurement")
-
     print("TMF8701 distance reader ready.")
+    return sensor
 
-def tmf8701_read_distance(sensor):
-    return sensor.get_distance_mm()
+def read_distance_mm(sensor):
+    if sensor.is_data_ready():
+        dist_mm = sensor.get_distance_mm()
+        return dist_mm
+    return None
 
+setup_sensor2 = setup_sensor_tmf8701()
 
 setup_sensor1 = setup_sensor()
 
@@ -88,7 +90,7 @@ STABLE   = 1  # need N centered readings to finish a turn
 MAX_TURN_MS = 10                                                 
 TARGET_DISTANCE = 250  # target distance in mm   
 COLOUR_DETECTION_DISTANCE = 50  # distance to detect color in mm
-PICKUP_DISTANCE = 10  # distance to pick up box in mm
+PICKUP_DISTANCE = 10.0  # distance to pick up box in mm
 
 DT_MS = 20
 
@@ -290,19 +292,19 @@ def seek_and_find(LoadingBay):
             continue
 
         elif loading_stage == 2:
-            sensor_distance2 = tmf8701_read_distance(setup_sensor2())
-            print("Distance:", sensor_distance1)
-            if sensor_distance1 < COLOUR_DETECTION_DISTANCE:
-                light, rgb = loading_pipeline.sample_color(loading_pipeline.color_power)
-                colour = loading_pipeline.detect_color(light, rgb)
-                print("Detected color:", colour)
-                loading_stage = 3
-                continue
-            if sensor_distance1 < PICKUP_DISTANCE:
-                # pipeline_main()
-                loading_stage = 3
-                continue
-        
+            sensor_distance2 = read_distance_mm(setup_sensor2)
+            print("Distance:", sensor_distance2)
+            #if sensor_distance2 < COLOUR_DETECTION_DISTANCE:
+            #    light, rgb = loading_pipeline.sample_color(loading_pipeline.color_power)
+            #    colour = loading_pipeline.detect_color(light, rgb)
+            #    print("Detected color:", colour)
+            #    continue
+            if sensor_distance2 != None:
+                if sensor_distance2 < PICKUP_DISTANCE:
+                    # pipeline_main()
+                    loading_stage = 3
+                    continue
+            
         elif loading_stage == 3:
             go_back(BASE, BASE)
             sleep_ms(500)
@@ -639,3 +641,4 @@ if __name__ == "__main__":
 
 
 main()
+
