@@ -159,6 +159,27 @@ def shift_with_correction(duration_ms):
 
         sleep_ms(DT_MS)
 
+def shift_back_with_correction(duration_ms):
+    t0 = ticks_ms()
+    while ticks_diff(ticks_ms(), t0) < duration_ms:
+        c = read_code()
+
+        if centered(c):
+            go_back(BASE, BASE)
+        elif slight_left(c):          # call the function
+            go_back(BASE - DELTA, BASE + DELTA)
+        elif slight_right(c):         # call the function
+            go_back(BASE + DELTA, BASE - DELTA)
+        elif c in (0b1100, 0b1000):   # far to left
+            go_back(BASE - HARD, BASE + HARD)
+        elif c in (0b0011, 0b0001):   # far to right
+            go_back(BASE + HARD, BASE - HARD)
+        else:
+            # unknown/lost -> gentle bias to move forward
+            go_back(BASE, BASE)
+
+        sleep_ms(DT_MS)
+
 
 
 def arc(side):
@@ -289,7 +310,6 @@ def seek_and_find(LoadingBay):
             if turn_counter_on:
                 turn_counter += 1
             turn_counter_on = False
-            # if we ran out of directives, default to 'F'
             sensor_distance1 = vl5310x_read_distance(setup_sensor1)
             print("Distance:", sensor_distance1)
             if sensor_distance1 < TARGET_DISTANCE:
@@ -311,6 +331,7 @@ def seek_and_find(LoadingBay):
             go_spin(90)                 # branch_index += arc() will consume this route entry
             sleep_ms(DT_MS)
             loading_stage = 2
+            tick0 = tick_ms()
             continue
 
         elif loading_stage == 2:
@@ -325,23 +346,15 @@ def seek_and_find(LoadingBay):
                 if sensor_distance2 < PICKUP_DISTANCE:
                     # pipeline_main()
                     loading_stage = 3
+                    delta_tick = ticks_diff(ticks_ms(), tick0)
                     continue
             
         elif loading_stage == 3:
-            go_back(BASE, BASE)
-            sleep_ms(500)
-            spin_right(180)
-            go_back(BASE, BASE)
-            sleep_ms(500)
-
+            shift_back_with_correction(delta_tick)
+            spin_right(90)
             loading_stage = 4
 
-        
         elif loading_stage == 4 and c == 0b1110:
-            go_spin(90)
-            loading_stage = 5
-
-        elif loading_stage == 5 and c == 0b1110:
             turn_counter += 1  
 
         if centered(c):
