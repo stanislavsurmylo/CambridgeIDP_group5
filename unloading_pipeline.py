@@ -11,12 +11,6 @@ UNLOAD_SPEED = 100          # percent (0–100)
 
 
 def unload_once():
-    """
-    Basic unloading pipeline:
-    - Create an Actuator on the standard pins
-    - Retract at full speed for UNLOAD_RETRACT_TIME seconds
-    - Then stop
-    """
     print("Unloading: retracting actuator for {}s at speed {}."
           .format(UNLOAD_RETRACT_TIME, UNLOAD_SPEED))
 

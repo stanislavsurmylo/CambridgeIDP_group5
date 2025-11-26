@@ -60,7 +60,11 @@ def initialize_actuator(actuator):
     sleep(zone_extend_time)
     actuator.stop()
     sleep(0.1)
+    global actuator_initialized_cycle
+    actuator_initialized_cycle = True
     print("Actuator initialization complete. Ready for loading.\n")
+
+
 
 def perform_lift(actuator):
     print("Lift phase: extending actuator for {}s at speed {}.".format(LIFT_TIME, ACTUATOR_SPEED))
@@ -140,31 +144,18 @@ def pipeline_main():
     detected_color = None
     init_distance_unlock = False
 
+    # Only run the loading loop when we are in a valid loading zone (1 or 2)
+ 
+
     while True:
         dist_cm = read_distance_cm(tmf8701)
-       
+
+        if LOADING_ZONE not in (1, 2):
+            print("Not in loading zone 1 or 2, stopping loading pipeline.")
+            break
+
         if dist_cm is None:
             print("Distance: -- waiting for sensor data")
-            sleep(LOOP_DELAY)
-            continue
-
-        if dist_cm >= MIN_INIT_DISTANCE_CM and not init_distance_unlock:
-            print(
-                "Distance {:.2f} cm >= minimum init distance {} cm. Init unlocked."
-                .format(dist_cm, MIN_INIT_DISTANCE_CM)
-            )
-            init_distance_unlock = True
-            sleep(LOOP_DELAY)
-            continue
-
-        if (
-            dist_cm <= ZONE_PRESET_DISTANCE_CM
-            and init_distance_unlock
-            and not actuator_initialized_cycle
-        ):
-            print("Distance within {} cm. Initializing actuator.".format(ZONE_PRESET_DISTANCE_CM))
-            initialize_actuator(actuator)
-            actuator_initialized_cycle = True
             sleep(LOOP_DELAY)
             continue
 

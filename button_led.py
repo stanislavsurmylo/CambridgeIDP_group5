@@ -34,7 +34,6 @@ def blink_1hz():
 
 
 def _ensure_blink_sm():
-    """Create the PIO state machine for the yellow LED if it doesn't exist."""
     global _sm
     if _sm is None:
         _sm = rp2.StateMachine(
@@ -56,14 +55,11 @@ def register_callbacks(on_start=None, on_pause=None):
     elif not _is_running and _on_pause:
         _on_pause()
 
-
 def init_button_interrupt(on_start=None, on_pause=None):
     register_callbacks(on_start=on_start, on_pause=on_pause)
 
-
 def is_bot_running():
     return _is_running
-
 
 def _handle_button(pin):
     global _is_running, _last_press_ms
@@ -72,7 +68,6 @@ def _handle_button(pin):
         return
     _last_press_ms = now
     _toggle_state()
-
 
 def _toggle_state(initial=False):
     global _is_running, _sm
@@ -94,10 +89,7 @@ def _toggle_state(initial=False):
         if _on_pause:
             _on_pause()
 
-
-
 button.irq(trigger=Pin.IRQ_RISING, handler=_handle_button)
-
 
 _ensure_blink_sm()
 if _is_running:
