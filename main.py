@@ -8,6 +8,8 @@ from vl53l0x_distance import setup_sensor, vl5310x_read_distance
 from tmf8701_distance import setup_sensor, tmf8701_read_distance
 
 setup_sensor1 = setup_sensor()
+def setup_sensor2():
+    pass
 
 
 
@@ -208,6 +210,7 @@ def path_to_route(path):
 
 def seek_and_find(LoadingBay):
     global current_heading
+    turn_counter_on = True
     box_approached = 0
     turn_counter = 0
     box_found = False
@@ -227,7 +230,9 @@ def seek_and_find(LoadingBay):
         #print(branch_index)
         
         if c == 0b1110 and not box_found:
-            turn_counter += 1
+            if turn_counter_on:
+                turn_counter += 1
+            turn_counter_on = False
             # if we ran out of directives, default to 'F'
             sensor_distance1 = vl5310x_read_distance(setup_sensor1)
             print("Distance:", sensor_distance1)
@@ -239,6 +244,7 @@ def seek_and_find(LoadingBay):
                 
         else:  # 'F' -> skip this node
             tick0 = ticks_ms()
+            turn_counter_on = True
 
         # if c == 0b1110 and box_found:
         #     x += arc('L')                 # branch_index += arc() will consume this route entry
@@ -251,15 +257,14 @@ def seek_and_find(LoadingBay):
             box_approached = 1
             continue
 
-        # if box_approached == 1:
-        #     # if we ran out of directives, default to 'F'
-        #     sensor_distance2 = vl5310x_read_distance(setup_sensor1)
-        #     print("Distance:", sensor_distance1)
-        #     if sensor_distance1 < TARGET_DISTANCE:
-        #         tick1 = ticks_ms()
-        #         if tick1 - tick0 > 50:
-        #             box_found = True
-        #             continue
+        if box_approached == 1:
+            sensor_distance2 = tmf8701_read_distance(setup_sensor2)
+            print("Distance:", sensor_distance1)
+            if sensor_distance1 < TARGET_DISTANCE:
+                tick1 = ticks_ms()
+                if tick1 - tick0 > 50:
+                    box_found = True
+                    continue
             
 
         if centered(c):
@@ -469,7 +474,8 @@ def main():
 
         go_to(last_checked_bay) 
         # we go to last loading bay spot and check if there are any boxes in there. If there are, we pick them up and transport them.
-        if seek_and_find(last_checked_bay) is not None: #if we found any boxes there
+        if seek_and_find(last_checked_bay
+                         ) is not None: #if we found any boxes there
             color = seek_and_find(last_checked_bay)  # get the color of the box
             delivery_area = color_to_vertex(color)  # map color to vertex
             go_to(delivery_area)  # go to delivery area
