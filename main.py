@@ -1,5 +1,5 @@
 # four_sensor_table_arc.py — 4-bit follower + debounced arc turns
-from machine import Pin, PWM
+from machine import Pin, PWM, I2C
 from time import sleep_ms, ticks_ms, ticks_diff
 import map
 from map import V
@@ -55,8 +55,8 @@ def W(x): return x == WHITE_LEVEL
 
 # branch_route = []  path = list of vertices; route = list of 'L','R','F','B'
 # branch_index = 0
-current_heading = 0
-current_vertex = V.START
+current_heading = 1
+current_vertex = V.RIGHT
 finish_vertex = None
 finish_heading = None
 
@@ -290,7 +290,7 @@ def seek_and_find(LoadingBay):
             continue
 
         elif loading_stage == 2:
-            sensor_distance2 = tmf8701_read_distance(setup_sensor2)
+            sensor_distance2 = tmf8701_read_distance(setup_sensor2())
             print("Distance:", sensor_distance1)
             if sensor_distance1 < COLOUR_DETECTION_DISTANCE:
                 light, rgb = loading_pipeline.sample_color(loading_pipeline.color_power)
@@ -537,7 +537,7 @@ def main():
 
     while boxes_delivered < 4:
 
-        go_to(last_checked_bay) 
+        # go_to(last_checked_bay) 
         # we go to last loading bay spot and check if there are any boxes in there. If there are, we pick them up and transport them.
         if seek_and_find(last_checked_bay) is not None: #if we found any boxes there
             color = seek_and_find(last_checked_bay)  # get the color of the box
