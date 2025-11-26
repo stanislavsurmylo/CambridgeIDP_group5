@@ -124,7 +124,7 @@ def read_distance_cm(sensor):
     return None
 
 
-def main():
+def pipeline_main():
     # Power control
     color_power = Pin(COLOR_POWER_PIN, Pin.OUT, value=0)
     

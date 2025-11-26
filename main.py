@@ -1,16 +1,41 @@
 # four_sensor_table_arc.py — 4-bit follower + debounced arc turns
-from machine import Pin, PWM
+from machine import Pin, PWM, I2C
 from time import sleep_ms, ticks_ms, ticks_diff
 import map
 from map import V
 import map
 from vl53l0x_distance import setup_sensor, vl5310x_read_distance
-from tmf8701_distance import setup_sensor, tmf8701_read_distance
+from libs.tmf8701 import DFRobot_TMF8701
+from loading_pipeline import pipeline_main
+import loading_pipeline
+from linear_actuator import unload_robot
+
+# colour sensor:
+loading_pipeline.setup_sensor_tcs3472()
+COLOR_POWER_PIN = 0
+color_power = Pin(COLOR_POWER_PIN, Pin.OUT, value=0)
 
 setup_sensor1 = setup_sensor()
-def setup_sensor2():
-    pass
 
+I2C_ID = 0
+PIN_SDA = 8     # GP8
+PIN_SCL = 9     # GP9
+SAMPLE_INTERVAL_SECONDS = 0.5
+
+def setup_sensor2():
+    i2c = I2C(I2C_ID, sda=Pin(PIN_SDA), scl=Pin(PIN_SCL))
+    sensor = DFRobot_TMF8701(i2c)
+
+    if sensor.begin() != 0:
+        raise RuntimeError("TMF8701 initialization failed")
+
+    if not sensor.start_measurement(sensor.eMODE_CALIB, sensor.eDISTANCE):
+        raise RuntimeError("TMF8701 failed to start measurement")
+
+    print("TMF8701 distance reader ready.")
+
+def tmf8701_read_distance(sensor):
+    return sensor.get_distance_mm()
 
 
 # ----- SENSORS (left->right). Swap sFL,sFR wires here if needed -----
@@ -55,7 +80,7 @@ TURN_IN  = 0 # arc inner wheel speed
 DEBOUNCE = 3  # front trigger must persist N cycles
 STABLE   = 1  # need N centered readings to finish a turn
 MAX_TURN_MS = 10                                                 
-TARGET_DISTANCE = 250  # target distance in mm   
+TARGET_DISTANCE = 280  # target distance in mm   
 COLOUR_DETECTION_DISTANCE = 50  # distance to detect color in mm
 PICKUP_DISTANCE = 10  # distance to pick up box in mm
 
@@ -83,6 +108,7 @@ def read_code():
 def go(vL, vR): mL.fwd(vL); mR.fwd(vR)
 def spin_left(v): mL.bwd(v); mR.fwd(v)
 def spin_right(v): mL.fwd(v); mR.bwd(v)
+def go_back(vL, vR): mL.bwd(vL); mR.bwd(vR)
 
 def shift_with_correction(time):
     t0 = ticks_ms()
@@ -210,18 +236,18 @@ def path_to_route(path):
 
 def seek_and_find(LoadingBay):
     global current_heading
+    global current_vertex
+    colour = 'red' # default color if none found
+    loading_stage = 0
     turn_counter_on = True
-    box_approached = 0
     turn_counter = 0
-    box_found = False
-    pickup_completed = False
     for edge in map.DIRECTED_EDGES:
         if edge.src == LoadingBay and edge.dst in [V.B_DOWN_END, V.A_DOWN_END, V.B_UP_END, V.A_UP_END]:
             if edge.start_heading - current_heading == 2 or edge.start_heading - current_heading == -2:
                 spin_right(BASE)
                 spin_sleep(180, BASE)
     
-    while not pickup_completed:
+    while turn_counter < 7:
         c = read_code()
         #print("Code:",bin(c))
         FL = (c>>3)&1;  FR = c&1
@@ -229,7 +255,7 @@ def seek_and_find(LoadingBay):
                 # If all four see white: follow the next route directive
         #print(branch_index)
         
-        if c == 0b1110 and not box_found:
+        if c == 0b1110 and loading_stage == 0:
             if turn_counter_on:
                 turn_counter += 1
             turn_counter_on = False
@@ -237,12 +263,12 @@ def seek_and_find(LoadingBay):
             sensor_distance1 = vl5310x_read_distance(setup_sensor1)
             print("Distance:", sensor_distance1)
             if sensor_distance1 < TARGET_DISTANCE:
-                tick1 = ticks_ms()
-                if tick1 - tick0 > 50:
-                    box_found = True
+                # tick1 = ticks_ms()
+                # if tick1 - tick0 > 50:
+                    loading_stage = 1
                     continue
                 
-        else:  # 'F' -> skip this node
+        elif loading_stage == 0:  
             tick0 = ticks_ms()
             turn_counter_on = True
 
@@ -251,21 +277,42 @@ def seek_and_find(LoadingBay):
         #     sleep_ms(DT_MS)
         #     continue
 
-        if c == 0b1110 and box_found:
+        if c == 0b1110 and loading_stage == 1:
             go_spin(90)                 # branch_index += arc() will consume this route entry
             sleep_ms(DT_MS)
-            box_approached = 1
+            loading_stage = 2
             continue
 
-        if box_approached == 1:
+        elif loading_stage == 2:
             sensor_distance2 = tmf8701_read_distance(setup_sensor2)
             print("Distance:", sensor_distance1)
-            if sensor_distance1 < TARGET_DISTANCE:
-                tick1 = ticks_ms()
-                if tick1 - tick0 > 50:
-                    box_found = True
-                    continue
-            
+            if sensor_distance1 < COLOUR_DETECTION_DISTANCE:
+                light, rgb = loading_pipeline.sample_color(loading_pipeline.color_power)
+                colour = loading_pipeline.detect_color(light, rgb)
+                print("Detected color:", colour)
+                loading_stage = 3
+                continue
+            if sensor_distance1 < PICKUP_DISTANCE:
+                pipeline_main()
+                loading_stage = 3
+                continue
+        
+        elif loading_stage == 3:
+            go_back(BASE, BASE)
+            sleep_ms(500)
+            spin_right(180)
+            go_back(BASE, BASE)
+            sleep_ms(500)
+
+            loading_stage = 4
+
+        
+        elif loading_stage == 4 and c == 0b1110:
+            go_spin(90)
+            loading_stage = 5
+
+        elif loading_stage == 5 and c == 0b1110:
+            turn_counter += 1  
 
         if centered(c):
             go(BASE, BASE)
@@ -280,6 +327,15 @@ def seek_and_find(LoadingBay):
         else:
             # unknown/lost -> gentle bias to move forward
             go(BASE, BASE-10)
+        sleep_ms(DT_MS)
+    if current_vertex == V.B_DOWN_BEG:
+        current_vertex = V.B_DOWN_END
+    elif current_vertex == V.B_UP_BEG:
+        current_vertex = V.B_UP_END
+    elif current_vertex == V.A_UP_BEG:
+        current_vertex = V.A_UP_END
+    elif current_vertex == V.A_DOWN_BEG:
+        current_vertex = V.A_DOWN_END
 
 
 def complete_route(branch_route):
@@ -434,7 +490,6 @@ def complete_route(branch_route):
     sleep_ms(200)
     current_heading = finish_heading
 
-
 def go_to(finish_vertex):
     global current_vertex
 
@@ -460,8 +515,6 @@ def color_to_vertex(color: str) -> V:
         raise ValueError(f"Unknown color: {color!r}")
 
 
-from linear_actuator import unload_robot
-from pickup import seek_and_find
 
 
 def main():
