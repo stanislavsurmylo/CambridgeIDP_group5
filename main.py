@@ -5,12 +5,13 @@ import map
 from map import V
 from vl53l0x_distance import setup_sensor, vl5310x_read_distance
 from libs.tmf8701 import DFRobot_TMF8701
-from loading_pipeline import pipeline_main
-import loading_pipeline
+# import loading_pipeline
+# from loading_pipeline import pipeline_main
+
 from linear_actuator import unload_robot
 
 # colour sensor:
-loading_pipeline.setup_sensor_tcs3472()
+# loading_pipeline.setup_sensor_tcs3472()
 COLOR_POWER_PIN = 0
 color_power = Pin(COLOR_POWER_PIN, Pin.OUT, value=0)
 
@@ -298,7 +299,7 @@ def seek_and_find(LoadingBay):
                 loading_stage = 3
                 continue
             if sensor_distance1 < PICKUP_DISTANCE:
-                pipeline_main()
+                # pipeline_main()
                 loading_stage = 3
                 continue
         
@@ -341,6 +342,7 @@ def seek_and_find(LoadingBay):
         current_vertex = V.A_UP_END
     elif current_vertex == V.A_DOWN_BEG:
         current_vertex = V.A_DOWN_END
+    return colour
 
 def complete_route(branch_route):
     global current_heading
@@ -527,28 +529,28 @@ def color_to_vertex(color: str) -> V:
 from linear_actuator import unload_robot
 
 
-# def main():
-#     global current_vertex
-#     global last_checked_bay
-#     global boxes_delivered
-#     global number_of_bay
+def main():
+    global current_vertex
+    global last_checked_bay
+    global boxes_delivered
+    global number_of_bay
 
-#     while boxes_delivered < 4:
+    while boxes_delivered < 4:
 
-#         go_to(last_checked_bay) 
-#         # we go to last loading bay spot and check if there are any boxes in there. If there are, we pick them up and transport them.
-#         if seek_and_find(last_checked_bay) is not None: #if we found any boxes there
-#             color = seek_and_find(last_checked_bay)  # get the color of the box
-#             delivery_area = color_to_vertex(color)  # map color to vertex
-#             go_to(delivery_area)  # go to delivery area
-#             boxes_delivered += 1 # increment boxes delivered
-#             unload_robot() # unload any boxes we have
-#         else:
-#             number_of_bay = (number_of_bay + 1) % len(loading_bays) # set target to next bay
+        go_to(last_checked_bay) 
+        # we go to last loading bay spot and check if there are any boxes in there. If there are, we pick them up and transport them.
+        if seek_and_find(last_checked_bay) is not None: #if we found any boxes there
+            color = seek_and_find(last_checked_bay)  # get the color of the box
+            delivery_area = color_to_vertex(color)  # map color to vertex
+            go_to(delivery_area)  # go to delivery area
+            boxes_delivered += 1 # increment boxes delivered
+            unload_robot() # unload any boxes we have
+        else:
+            number_of_bay = (number_of_bay + 1) % len(loading_bays) # set target to next bay
 
 
-#     go_to(V.START)
-#     go(0,0)
+    go_to(V.START)
+    go(0,0)
 
 
 
@@ -601,39 +603,39 @@ if __name__ == "__main__":
     unload_robot()
 
 
-def main():
-    print("Starting main function")
-    # actuator = Actuator(DIR_PIN, PWM_PIN)
+# def main():
+#     print("Starting main function")
+#     # actuator = Actuator(DIR_PIN, PWM_PIN)
     
-    # # Test retract
-    # actuator.retract(speed=100)
-    # sleep(5)
-    # actuator.stop()
-    # sleep(2)  # Pause so you can measure
+#     # # Test retract
+#     # actuator.retract(speed=100)
+#     # sleep(5)
+#     # actuator.stop()
+#     # sleep(2)  # Pause so you can measure
     
-    # print("Unloading complete")
+#     # print("Unloading complete")
     
-    global current_vertex
-    global last_checked_bay
-    global boxes_delivered
-    global number_of_bay
+#     global current_vertex
+#     global last_checked_bay
+#     global boxes_delivered
+#     global number_of_bay
 
-    while boxes_delivered < 2:
+#     while boxes_delivered < 2:
 
-        go_to(last_checked_bay)
-        print(current_vertex)
-        # we go to last loading bay spot and check if there are any boxes in there. If there are, we pick them up and transport them.
-        if True: #if we found any boxes there
-            go_to(V.GREEN)  # go to delivery area
-            print(1)
-            boxes_delivered += 1 # increment boxes delivered
-            unload_robot() # unload any boxes we have
-            number_of_bay = (number_of_bay + 1) % len(loading_bays) # set target to next bay
-            last_checked_bay = loading_bays[number_of_bay]
+#         go_to(last_checked_bay)
+#         print(current_vertex)
+#         # we go to last loading bay spot and check if there are any boxes in there. If there are, we pick them up and transport them.
+#         if True: #if we found any boxes there
+#             go_to(V.GREEN)  # go to delivery area
+#             print(1)
+#             boxes_delivered += 1 # increment boxes delivered
+#             unload_robot() # unload any boxes we have
+#             number_of_bay = (number_of_bay + 1) % len(loading_bays) # set target to next bay
+#             last_checked_bay = loading_bays[number_of_bay]
 
 
-    go_to(V.START)
-    go(0,0)
+#     go_to(V.START)
+#     go(0,0)
 
 
 main()
