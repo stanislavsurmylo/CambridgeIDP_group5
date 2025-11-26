@@ -194,7 +194,8 @@ def main():
             perform_lift(actuator)
             lift_triggered = True
             sleep(LOOP_DELAY)
-            continue
+            print("Loading cycle finished. Exiting loading loop.")
+            break
 
         if dist_cm > ZONE_PRESET_DISTANCE_CM and (actuator_initialized_cycle or color_sampled or lift_triggered):
             print("Object moved out of range. Resetting cycle state.")
@@ -208,4 +209,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
