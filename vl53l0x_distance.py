@@ -39,8 +39,8 @@ def setup_sensor():
     sensor = VL53L0X.VL53L0Xclass(i2c_bus)
 
     # Higher numbers = longer pulse → more light → potentially more range
-    sensor.set_Vcsel_pulse_period(sensor.vcsel_period_type[0], 18)
-    sensor.set_Vcsel_pulse_period(sensor.vcsel_period_type[1], 14)
+    sensor.set_Vcsel_pulse_period(sensor.vcsel_period_type[0], 16)
+    sensor.set_Vcsel_pulse_period(sensor.vcsel_period_type[1], 12)
 
     return sensor
 

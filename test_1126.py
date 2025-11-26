@@ -6,7 +6,8 @@ from map import V
 import vl53l0x_distance
 from vl53l0x_distance import setup_sensor, vl5310x_read_distance
 from libs.tmf8701 import DFRobot_TMF8701
-from linear_actuator import unload_robot
+from linear_actuator import unload_robot, Actuator
+import loading_pipeline
 
 LOADING_ZONE = 1  # zone down = 1, zone up = 2
 
@@ -48,6 +49,7 @@ setup_sensor1 = setup_sensor()
 # colour sensor:
 color_power = Pin(COLOR_POWER_PIN, Pin.OUT, value=0)
 
+# tmf8701 distance sensor:
 def setup_sensor_tmf8701():
     i2c = I2C(I2C_ID, sda=Pin(PIN_SDA), scl=Pin(PIN_SCL))
     sensor = DFRobot_TMF8701(i2c)
@@ -137,6 +139,7 @@ def read_code():
 def go(vL, vR): mL.fwd(vL); mR.fwd(vR)
 def spin_left(v): mL.bwd(v); mR.fwd(v)
 def spin_right(v): mL.fwd(v); mR.bwd(v)
+def go_back(vL, vR): mL.bwd(vL); mR.bwd(vR)
 
 def shift_with_correction(duration_ms):
     t0 = ticks_ms()
@@ -204,8 +207,6 @@ def go_spin(deg):
     spin_left(BASE)   # inner slower
     spin_sleep(deg, BASE)
 
-
-
 def turn_sleep(deg, speed):
     distance = (deg / 180) * 3.14 * RADIUS_OF_TURN  # distance to travel
     time_ms = (distance / (speed * 0.25)) * 1000  # time in ms
@@ -269,6 +270,11 @@ def seek_and_find(LoadingBay):
     global current_vertex
     colour = None 
     loading_stage = 0
+    # Flags mirroring the loading_pipeline state machine
+    actuator_initialized_cycle = True  # actuator was initialised in main()
+    color_sampled = False
+    lift_triggered = False
+    detected_color = None
     turn_counter_on = True
     turn_counter = 0
     for edge in map.DIRECTED_EDGES:
@@ -292,7 +298,7 @@ def seek_and_find(LoadingBay):
             # if we ran out of directives, default to 'F'
             sensor_distance1 = vl5310x_read_distance(setup_sensor1)
             print("Distance:", sensor_distance1)
-            if sensor_distance1 < TARGET_DISTANCE:
+            if sensor_distance1 is not None and sensor_distance1 < TARGET_DISTANCE:
        
                 # tick1 = ticks_ms()
                 # if tick1 - tick0 > 50:
@@ -308,24 +314,86 @@ def seek_and_find(LoadingBay):
         #     continue
 
         if c == 0b1110 and loading_stage == 1:
-            go_spin(90)                 # branch_index += arc() will consume this route entry
+            # Only commit to the 90° turn when distance sensor 1 reports that
+            # the object is within pickup range.
+            sensor_distance1 = vl5310x_read_distance(setup_sensor1)
+            print("Distance sensor1 before turn:", sensor_distance1)
+
+            if sensor_distance1 is None or sensor_distance1 > PICKUP_DISTANCE:
+                # Not close enough yet: keep going forward and re-check next loop.
+                go(BASE, BASE)
+                sleep_ms(DT_MS)
+                continue
+
+            # Now we are within PICKUP_DISTANCE: turn into the bay and start
+            # the loading-stage-2 logic that mirrors loading_pipeline.
+            go_spin(90)
             sleep_ms(DT_MS)
             loading_stage = 2
             continue
 
         elif loading_stage == 2:
             sensor_distance2 = read_distance_mm(setup_sensor2)
-            print("Distance:", sensor_distance2)
-            #if sensor_distance2 < COLOUR_DETECTION_DISTANCE:
-            #    light, rgb = loading_pipeline.sample_color(loading_pipeline.color_power)
-            #    colour = loading_pipeline.detect_color(light, rgb)
-            #    print("Detected color:", colour)
-            #    continue
-            if sensor_distance2 != None:
-                if sensor_distance2 < PICKUP_DISTANCE:
-                    # pipeline_main()
-                    loading_stage = 3
-                    continue
+
+            if sensor_distance2 is None:
+                print("Sensor2 distance: -- waiting for data")
+                sleep_ms(DT_MS)
+                continue
+
+            # Convert mm from TMF8701 to cm, then reuse the same thresholds and
+            # if/else logic style as in loading_pipeline.pipeline_main().
+            dist_cm = sensor_distance2 / 10.0
+            print("Sensor2 distance (cm):", dist_cm)
+
+            # If we're close enough, sample the colour of the box (once)
+            if (
+                dist_cm <= COLOR_REFERENCE_DISTANCE_CM
+                and actuator_initialized_cycle
+                and not color_sampled
+            ):
+                light, rgb = loading_pipeline.sample_color(color_power)
+                detected_color = loading_pipeline.detect_color(rgb, light)
+                colour = detected_color
+                color_sampled = True
+                print("Light:", light, "RGB:", rgb, "Detected color:", detected_color)
+                sleep_ms(int(LOOP_DELAY * 1000))
+                continue
+
+            # When we're in lift range and colour is known, perform the lift using
+            # the same function as loading_pipeline.
+            if (
+                dist_cm <= LIFT_REFERENCE_DISTANCE_CM
+                and actuator_initialized_cycle
+                and color_sampled
+                and not lift_triggered
+            ):
+                print(
+                    "Starting lift: last detected color {}."
+                    .format(detected_color or "UNKNOWN")
+                )
+                local_actuator = Actuator(ACTUATOR_DIR_PIN, ACTUATOR_PWM_PIN)
+                loading_pipeline.perform_lift(local_actuator)
+                lift_triggered = True
+                sleep_ms(int(LOOP_DELAY * 1000))
+                print("Loading cycle finished.")
+                loading_stage = 3
+                continue
+
+            # If the object moves out of range after we started a cycle, reset state.
+            if dist_cm > ZONE_PRESET_DISTANCE_CM and (actuator_initialized_cycle or color_sampled or lift_triggered):
+                print("Object moved out of range. Resetting loading state.")
+                color_sampled = False
+                lift_triggered = False
+                detected_color = None
+                colour = None
+                loading_stage = 0
+                continue
+
+            # Otherwise, gently creep forward towards the object while we are still
+            # outside lift range.
+            go(BASE, BASE)
+            sleep_ms(DT_MS)
+            continue
             
         elif loading_stage == 3:
             go_back(BASE, BASE)
@@ -559,108 +627,30 @@ def main():
     global boxes_delivered
     global number_of_bay
 
+    # Initialise the actuator once at the very beginning using your existing code
+    actuator = Actuator(ACTUATOR_DIR_PIN, ACTUATOR_PWM_PIN)
+    loading_pipeline.initialize_actuator(actuator)
+
     while boxes_delivered < 4:
 
-        # go_to(last_checked_bay) 
-        # we go to last loading bay spot and check if there are any boxes in there. If there are, we pick them up and transport them.
-        if seek_and_find(last_checked_bay) is not None: #if we found any boxes there
-            color = seek_and_find(last_checked_bay)  # get the color of the box
-            delivery_area = color_to_vertex(color)  # map color to vertex
+        # Go to the last loading bay spot and check if there are any boxes there.
+        colour_found = seek_and_find(last_checked_bay)
+
+        # If we detected a colour, deliver that box.
+        if colour_found is not None:
+            delivery_area = color_to_vertex(colour_found)  # map color to vertex
             go_to(delivery_area)  # go to delivery area
-            boxes_delivered += 1 # increment boxes delivered
-            unload_robot() # unload any boxes we have
+            boxes_delivered += 1  # increment boxes delivered
+            unload_robot()  # unload any boxes we have
         else:
-            number_of_bay = (number_of_bay + 1) % len(loading_bays) # set target to next bay
+            # Move on to the next bay if nothing was found here.
+            number_of_bay = (number_of_bay + 1) % len(loading_bays)
+            last_checked_bay = loading_bays[number_of_bay]
 
-
+    # When all boxes are delivered, return to START and stop.
     go_to(V.START)
-    go(0,0)
-
-
-
-
-from machine import Pin, PWM
-from utime import sleep
-
-class Actuator:
-    def __init__(self, dirPin, PWMPin):
-        self.mDir = Pin(dirPin, Pin.OUT)  # set motor direction pin
-        self.pwm = PWM(Pin(PWMPin))  # set motor pwm pin
-        self.pwm.freq(1000)  # set PWM frequency
-        self.pwm.duty_u16(0)  # set duty cycle - 0=off
-           
-    def set(self, dir, speed):
-        self.mDir.value(dir)                     # forward = 0 reverse = 1 motor
-        self.pwm.duty_u16(int(65535 * speed / 100))  # speed range 0-100 motor
-    
-    def stop(self):
-        self.pwm.duty_u16(0)  # Stop the actuator
-    
-    def extend(self, speed=50):
-        """Extend the actuator at specified speed (0-100)"""
-        self.set(dir=0, speed=speed)
-    
-    def retract(self, speed=50):
-        """Retract the actuator at specified speed (0-100)"""
-        self.set(dir=1, speed=speed)
-
-DIR_PIN = 3
-PWM_PIN = 2
-TEST_DURATION = 1.0  # 1 second for testing
-
-def unload_robot():
-
-    go(0,0)
-    # Unloading robot to reduce weight on actuator
-    actuator = Actuator(DIR_PIN, PWM_PIN)
-    
-    # Test retract
-    actuator.retract(speed=100)
-    sleep(5)
-    actuator.stop()
-    sleep(2)  # Pause so you can measure
-    
-    print("Unloading complete")
+    go(0, 0)
 
 
 if __name__ == "__main__":
-    unload_robot()
-
-
-# def main():
-#     print("Starting main function")
-#     # actuator = Actuator(DIR_PIN, PWM_PIN)
-    
-#     # # Test retract
-#     # actuator.retract(speed=100)
-#     # sleep(5)
-#     # actuator.stop()
-#     # sleep(2)  # Pause so you can measure
-    
-#     # print("Unloading complete")
-    
-#     global current_vertex
-#     global last_checked_bay
-#     global boxes_delivered
-#     global number_of_bay
-
-#     while boxes_delivered < 2:
-
-#         go_to(last_checked_bay)
-#         print(current_vertex)
-#         # we go to last loading bay spot and check if there are any boxes in there. If there are, we pick them up and transport them.
-#         if True: #if we found any boxes there
-#             go_to(V.GREEN)  # go to delivery area
-#             print(1)
-#             boxes_delivered += 1 # increment boxes delivered
-#             unload_robot() # unload any boxes we have
-#             number_of_bay = (number_of_bay + 1) % len(loading_bays) # set target to next bay
-#             last_checked_bay = loading_bays[number_of_bay]
-
-
-#     go_to(V.START)
-#     go(0,0)
-
-
-main()
-
+    main()
