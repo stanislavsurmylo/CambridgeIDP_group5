@@ -259,4 +259,4 @@ if __name__ == "__main__":
      finish = V.GREEN          # any FINISH vertex
 
      path = shortest_path(GRAPH, start, finish)
-     print("Shortest path:", path)  
+    #  print("Shortest path:", path)  
