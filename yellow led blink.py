@@ -2,7 +2,7 @@ from machine import Pin
 import rp2
 import time
 
-PIN_YELLOW = 25
+PIN_YELLOW = 17
 
 @rp2.asm_pio(set_init=rp2.PIO.OUT_LOW)
 def blink_1hz():

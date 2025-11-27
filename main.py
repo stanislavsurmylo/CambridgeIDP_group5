@@ -1,6 +1,7 @@
 # four_sensor_table_arc.py — 4-bit follower + debounced arc turns
 from machine import Pin, PWM, I2C
 from time import sleep_ms, ticks_ms, ticks_diff
+import rp2
 import map
 from map import V
 import vl53l0x_distance
@@ -44,6 +45,7 @@ COLOR_REFERENCE_DISTANCE_CM = 3.0  # Trigger color sampling
 LIFT_REFERENCE_DISTANCE_CM = 2.0  # Trigger lift phase
 LOOP_DELAY = 0.2
 
+PIN_YELLOW = 17
 #vl53l0x distance sensor:
 setup_sensor1 = setup_sensor()
 
@@ -67,6 +69,27 @@ def read_distance_mm(sensor):
     return None
 
 setup_sensor2 = setup_sensor_tmf8701()
+
+
+@rp2.asm_pio(set_init=rp2.PIO.OUT_LOW)
+def blink_1hz():
+    set(pins, 1)           # LED ON
+    set(x, 31)             [6]
+    label("delay_high")
+    nop()                  [29]
+    jmp(x_dec, "delay_high")
+
+    set(pins, 0)           # LED OFF
+    set(x, 31)             [6]
+    label("delay_low")
+    nop()                  [29]
+    jmp(x_dec, "delay_low")
+
+
+# Start a dedicated PIO state machine that blinks the yellow LED at 1 Hz,
+# continuously, independent of the rest of the robot logic.
+sm_yellow = rp2.StateMachine(0, blink_1hz, freq=2000, set_base=Pin(PIN_YELLOW))
+sm_yellow.active(1)
 
 
 # ----- SENSORS (left->right). Swap sFL,sFR wires here if needed -----
@@ -304,7 +327,7 @@ def seek_and_find(LoadingBay):
     turn_counter = 0
     actuator = Actuator(ACTUATOR_DIR_PIN, ACTUATOR_PWM_PIN)
     loading_pipeline.initialize_actuator(actuator)
-    init_distance_unlock = True
+    actuator_initialized_cycle = True
 
     for edge in map.DIRECTED_EDGES:
         if edge.src == LoadingBay and edge.dst in [V.B_DOWN_END, V.A_DOWN_END, V.B_UP_END, V.A_UP_END]:

@@ -129,7 +129,7 @@ def read_distance_cm(sensor):
     return None
 
 
-def pipeline_main():
+def loading_pipeline_main():
     # Power control
     color_power = Pin(COLOR_POWER_PIN, Pin.OUT, value=0)
     
@@ -139,19 +139,10 @@ def pipeline_main():
     # Actuator
     actuator = Actuator(ACTUATOR_DIR_PIN, ACTUATOR_PWM_PIN)
 
-    actuator_initialized_cycle = False
     color_sampled = False
     lift_triggered = False
     detected_color = None
-    init_distance_unlock = False
 
-    # Only run the loading loop when we are in a valid loading zone (1 or 2)
- 
-def loading_pipeline_main():
-    tmf8701 = setup_sensor_tmf8701()
-    actuator = Actuator(ACTUATOR_DIR_PIN, ACTUATOR_PWM_PIN)
-    color_power = Pin(COLOR_POWER_PIN, Pin.OUT, value=0)
-    
     while True:
         dist_cm = read_distance_cm(tmf8701)
 
