@@ -103,9 +103,10 @@ mL = Motor(4,5, INVERT_LEFT)
 mR = Motor(7,6, INVERT_RIGHT)
 
 # ----- TUNING -----
-BASE  = 60    # straight speed
-DELTA = 20    # small correction to reach 0110
-HARD  = 40    # strong correction when far(turns)
+BASE  = 40    # straight speed
+SEEK_COEFF = 0.5  # how aggressively to seek line
+DELTA = 15    # small correction to reach 0110
+HARD  = 25    # strong correction when far(turns)
 TURN_OUT = 100 # arc outer wheel speed
 TURN_IN  = 0 # arc inner wheel speed
 DEBOUNCE = 3  # front trigger must persist N cycles
@@ -113,7 +114,7 @@ STABLE   = 1  # need N centered readings to finish a turn
 MAX_TURN_MS = 10                                                 
 TARGET_DISTANCE = 250  # target distance in mm   
 COLOUR_DETECTION_DISTANCE = 50  # distance to detect color in mm
-PICKUP_DISTANCE = 10.0  # distance to pick up box in mm
+PICKUP_DISTANCE = 30.0  # distance to pick up box in mm
 
 DT_MS = 20
 
@@ -223,10 +224,10 @@ def arc(side):
         print('X(F)')
     return add_branch_index
 
-def go_spin(deg):
-    shift_with_correction(270)  # move forward length of line
-    spin_left(BASE)   # inner slower
-    spin_sleep(deg, BASE)
+def go_spin(deg, speed):
+    shift_with_correction(1000)  # move forward length of line
+    spin_left(speed)   # inner slower
+    spin_sleep(deg, speed)
 
 
 
@@ -339,7 +340,7 @@ def seek_and_find(LoadingBay):
         #     continue
 
         if c == 0b1110 and loading_stage == 1:
-            go_spin(90)                 # branch_index += arc() will consume this route entry
+            go_spin(90, BASE)                 # branch_index += arc() will consume this route entry
             sleep_ms(DT_MS)
             loading_stage = 2
             tick0 = ticks_ms()
@@ -362,7 +363,10 @@ def seek_and_find(LoadingBay):
             
         elif loading_stage == 3:
             # Run the loading pipeline once we have reached pickup distance
-            # loading_pipeline_main()
+            go(0,0)
+            sleep(0.5)
+            loading_pipeline_main()
+            sleep(0.5)
             shift_back_with_correction(delta_tick)
             spin_right(BASE)
             spin_sleep(90, BASE)
@@ -588,9 +592,9 @@ def main():
     global boxes_delivered
     global number_of_bay
 
-    actuator =Actuator(ACTUATOR_DIR_PIN, ACTUATOR_PWM_PIN)
-    loading_pipeline.initialize_actuator(actuator)
-    ACTUATOR_INITIALIZED_CYCLE = True
+    actuator = Actuator(ACTUATOR_DIR_PIN, ACTUATOR_PWM_PIN)
+    # loading_pipeline.initialize_actuator(actuator)
+    actuator_initialized_cycle = True
 
     while boxes_delivered < 4:
 
@@ -656,8 +660,8 @@ def unload_robot():
     print("Unloading complete")
 
 
-if __name__ == "__main__":
-    unload_robot()
+# if __name__ == "__main__":
+#     unload_robot()
 
 
 # def main():

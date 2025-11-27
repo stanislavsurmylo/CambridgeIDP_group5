@@ -49,16 +49,16 @@ def get_zone_extend_time():
     return 0.0
     
 def initialize_actuator(actuator):
-    actuator.retract(speed=100)  # Maximum speed
-    sleep(INIT_RETRACT_TIME)
-    actuator.stop()
-    sleep(0.1)
-    print("Reached bottommost position")
-    # Set default position based on zone
-    zone_extend_time = get_zone_extend_time()
+    # actuator.retract(speed=100)  # Maximum speed
+    # sleep(INIT_RETRACT_TIME)
+    # actuator.stop()
+    # sleep(0.1)
+    # print("Reached bottommost position")
+    # # Set default position based on zone
+    # zone_extend_time = get_zone_extend_time()
     
     print("Setting default position for zone {} (extending for {} seconds)...".format(LOADING_ZONE, 6))
-    actuator.extend(speed=ACTUATOR_SPEED)
+    actuator.retract(speed=ACTUATOR_SPEED)
     sleep(6)
     actuator.stop()
     sleep(0.1)
@@ -143,6 +143,7 @@ def loading_pipeline_main():
     color_sampled = False
     lift_triggered = False
     detected_color = None
+    dist_cm = None
 
     while True:
         dist_cm = read_distance_cm(tmf8701)
