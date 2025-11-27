@@ -8,6 +8,7 @@ from vl53l0x_distance import setup_sensor, vl5310x_read_distance
 from libs.tmf8701 import DFRobot_TMF8701
 from linear_actuator import unload_robot
 import loading_pipeline
+from loading_pipeline import loading_pipeline_main
 
 LOADING_ZONE = 1  # zone down = 1, zone up = 2
 
@@ -361,7 +362,7 @@ def seek_and_find(LoadingBay):
                     continue
             
         elif loading_stage == 3:
-            
+            loading_pipeline_main()#!!!
             shift_back_with_correction(delta_tick)
             spin_right(BASE)
             spin_sleep(90, BASE)
