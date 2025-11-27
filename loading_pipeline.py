@@ -29,8 +29,8 @@ ACTUATOR_DIR_PIN = 3
 ACTUATOR_PWM_PIN = 2
 
 # Timing constants
-INIT_RETRACT_TIME = 6.0  # Retract to bottommost position
-ZONE_DOWN_EXTEND_TIME = 3.0  # Extend to default position for zone_down
+INIT_RETRACT_TIME = 3.0  # Retract to bottommost position
+ZONE_DOWN_EXTEND_TIME = 8.0  # Extend to default position for zone_down
 ZONE_UP_EXTEND_TIME = 0  # Extend to default position for zone_up
 LIFT_TIME = 3.0  # Base lift time when starting loading
 ACTUATOR_SPEED = 50
@@ -56,9 +56,10 @@ def initialize_actuator(actuator):
     print("Reached bottommost position")
     # Set default position based on zone
     zone_extend_time = get_zone_extend_time()
-    print("Setting default position for zone {} (extending for {} seconds)...".format(LOADING_ZONE, zone_extend_time))
+    
+    print("Setting default position for zone {} (extending for {} seconds)...".format(LOADING_ZONE, 6))
     actuator.extend(speed=ACTUATOR_SPEED)
-    sleep(zone_extend_time)
+    sleep(6)
     actuator.stop()
     sleep(0.1)
     global actuator_initialized_cycle
