@@ -7,6 +7,7 @@ import vl53l0x_distance
 from vl53l0x_distance import setup_sensor, vl5310x_read_distance
 from libs.tmf8701 import DFRobot_TMF8701
 from linear_actuator import unload_robot
+import loading_pipeline
 
 LOADING_ZONE = 1  # zone down = 1, zone up = 2
 
@@ -299,6 +300,9 @@ def seek_and_find(LoadingBay):
     loading_stage = 0
     turn_counter_on = True
     turn_counter = 0
+    actuator = Actuator(ACTUATOR_DIR_PIN, ACTUATOR_PWM_PIN)
+    loading_pipeline.initialize_actuator(actuator)
+
     for edge in map.DIRECTED_EDGES:
         if edge.src == LoadingBay and edge.dst in [V.B_DOWN_END, V.A_DOWN_END, V.B_UP_END, V.A_UP_END]:
             if edge.start_heading - current_heading == 2 or edge.start_heading - current_heading == -2:
@@ -684,4 +688,3 @@ if __name__ == "__main__":
 
 
 main()
-
