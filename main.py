@@ -1,14 +1,24 @@
 # four_sensor_table_arc.py — 4-bit follower + debounced arc turns
+import loading_pipeline_state_machine
 from machine import Pin, PWM, I2C
+<<<<<<< HEAD
 from time import sleep_ms, ticks_ms, ticks_diff
+=======
+from time import sleep_ms, ticks_ms, ticks_diff, sleep
+import rp2
+>>>>>>> 28464cc (Update main, loading pipeline state machine, and tests)
 import map
 from map import V
 import vl53l0x_distance
 from vl53l0x_distance import setup_sensor, vl53l0x_read_distance
 from libs.tmf8701 import DFRobot_TMF8701
-from linear_actuator import unload_robot
+from linear_actuator import Actuator
 import loading_pipeline
 from loading_pipeline import loading_pipeline_main
+from loading_pipeline_state_machine import LoadingPipelineState, pipeline_step
+
+PIN_YELLOW = 17
+BUTTON_PIN = 14 
 
 LOADING_ZONE = 1  # zone down = 1, zone up = 2
 
@@ -40,12 +50,57 @@ ACTUATOR_SPEED = 50
 
 MIN_INIT_DISTANCE_CM = 5
 ZONE_PRESET_DISTANCE_CM = 10.0 # Trigger zone preset extend
-COLOR_REFERENCE_DISTANCE_CM = 3.0  # Trigger color sampling
-LIFT_REFERENCE_DISTANCE_CM = 2.0  # Trigger lift phase
+COLOR_REFERENCE_DISTANCE_CM = 5  # Trigger color sampling
+LIFT_REFERENCE_DISTANCE_CM = 3  # Trigger lift phase
 LOOP_DELAY = 0.2
 
+<<<<<<< HEAD
+=======
+@rp2.asm_pio(set_init=rp2.PIO.OUT_LOW)
+def blink_1hz():
+    set(pins, 1)           # LED ON
+    set(x, 31)             [6]
+    label("delay_high")
+    nop()                  [29]
+    jmp(x_dec, "delay_high")
+
+    set(pins, 0)           # LED OFF
+    set(x, 31)             [6]
+    label("delay_low")
+    nop()                  [29]
+    jmp(x_dec, "delay_low")
+
+def unload_robot():
+    go(0,0)
+    # Unloading robot to reduce weight on actuator
+    actuator = Actuator(ACTUATOR_DIR_PIN, ACTUATOR_PWM_PIN)
+    
+    # Test retract
+    actuator.retract(speed=100)
+    sleep(1)
+    actuator.stop()
+    sleep(1)  # Pause so you can measure
+    print("Unloading complete")
+
+def _button_irq(pin):
+    # One‑shot emergency stop: once pressed, latch stop state.
+    # Keep this very small: just set a flag and stop the motors.
+    global emergency_stop
+    emergency_stop = True
+    mL.stop()
+    mR.stop()
+
+# Trigger on falling edge (button pressed to GND when using pull-up)
+button = Pin(BUTTON_PIN, Pin.IN, Pin.PULL_UP)
+emergency_stop = False
+button.irq(trigger=Pin.IRQ_FALLING, handler=_button_irq)
+
+>>>>>>> 28464cc (Update main, loading pipeline state machine, and tests)
 #vl53l0x distance sensor:
 setup_sensor1 = setup_sensor()
+
+
+loading_state = LoadingPipelineState()
 
 # colour sensor:
 color_power = Pin(COLOR_POWER_PIN, Pin.OUT, value=0)
@@ -143,8 +198,12 @@ def spin_right(v): mL.fwd(v); mR.bwd(v)
 def go_back(vL, vR): mL.bwd(vL); mR.bwd(vR)
 
 def shift_with_correction(duration_ms):
+    global emergency_stop
     t0 = ticks_ms()
     while ticks_diff(ticks_ms(), t0) < duration_ms:
+        if emergency_stop:
+            go(0, 0)
+            break
         c = read_code()
 
         if centered(c):
@@ -164,23 +223,20 @@ def shift_with_correction(duration_ms):
         sleep_ms(DT_MS)
 
 def shift_back_with_correction(duration_ms):
+    global emergency_stop
     t0 = ticks_ms()
     while ticks_diff(ticks_ms(), t0) < duration_ms:
+        if emergency_stop:
+            go(0, 0)
+            break
         c = read_code()
 
         if centered(c):
             go_back(BASE, BASE)
-        elif slight_left(c):          # call the function
-            go_back(BASE - DELTA, BASE + DELTA)
-        elif slight_right(c):         # call the function
-            go_back(BASE + DELTA, BASE - DELTA)
         elif c in (0b1100, 0b1000):   # far to left
-            go_back(BASE - HARD, BASE + HARD)
+            go_back(BASE, BASE-10)
         elif c in (0b0011, 0b0001):   # far to right
-            go_back(BASE + HARD, BASE - HARD)
-        else:
-            # unknown/lost -> gentle bias to move forward
-            go_back(BASE, BASE)
+            go_back(BASE, BASE+10)
 
         sleep_ms(DT_MS)
 
@@ -300,6 +356,7 @@ def path_to_route(path):
 def seek_and_find(LoadingBay):
     global current_heading
     global current_vertex
+    global emergency_stop
     colour = None 
     loading_stage = 0
     turn_counter_on = True
@@ -310,7 +367,7 @@ def seek_and_find(LoadingBay):
                 spin_right(BASE)
                 spin_sleep(180, BASE)
     
-    while turn_counter < 7:
+    while turn_counter < 7 and not emergency_stop:
         c = read_code()
         print("loading stage:",loading_stage)
         FL = (c>>3)&1;  FR = c&1
@@ -362,10 +419,34 @@ def seek_and_find(LoadingBay):
                     continue
             
         elif loading_stage == 3:
+<<<<<<< HEAD
             # Run the loading pipeline once we have reached pickup distance
             go(0,0)
             sleep(0.5)
             loading_pipeline_main()
+=======
+            # Run the loading pipeline state machine until it either
+            # completes a lift or decides to reset the cycle.
+            global loading_state
+            go(0,0)
+            sleep(0.5)
+
+            while True:
+                result = pipeline_step(loading_state)
+                print("Loading pipeline step result:", result)
+
+                # "waiting_sensor" and "monitoring" mean just keep polling
+                if result in ("waiting_sensor", "monitoring", "init_unlocked", "actuator_initialized", "color_sampled"):
+                    continue
+
+                # Stop once the lift is done or the state machine resets
+                if result in ("lift_triggered", "state_reset"):
+                    break
+
+                # Any unexpected result: break to avoid hanging
+                break
+
+>>>>>>> 28464cc (Update main, loading pipeline state machine, and tests)
             sleep(0.5)
             shift_back_with_correction(delta_tick)
             spin_right(BASE)
@@ -407,6 +488,7 @@ def seek_and_find(LoadingBay):
 def complete_route(branch_route):
     global current_heading
     global current_vertex
+    global emergency_stop
     branch_index = 0
 
     if branch_route[branch_index] == 'R':
@@ -423,7 +505,7 @@ def complete_route(branch_route):
     fl_cnt = fr_cnt = 0
     stable = 0
     t0 = 0
-    while branch_index < len(branch_route) or not centered(read_code()):
+    while (branch_index < len(branch_route) or not centered(read_code())) and not emergency_stop:
         #print(current_heading)
         c = read_code()
         #print("Code:",bin(c))
@@ -591,6 +673,16 @@ def main():
     global last_checked_bay
     global boxes_delivered
     global number_of_bay
+    global emergency_stop
+    global init_distance_unlock
+
+    # This flag controls whether we've already run the actuator init
+    # cycle for the current round. It is reset at the end of each loop
+    # so that every round starts with a fresh init cycle.
+    init_distance_unlock = False
+
+    sm_yellow = rp2.StateMachine(0, blink_1hz, freq=2000, set_base=Pin(PIN_YELLOW))
+    sm_yellow.active(1)
 
     actuator = Actuator(ACTUATOR_DIR_PIN, ACTUATOR_PWM_PIN)
     # loading_pipeline.initialize_actuator(actuator)
@@ -598,10 +690,34 @@ def main():
 
     while boxes_delivered < 4:
 
+<<<<<<< HEAD
         # go_to(last_checked_bay) 
         # we go to last loading bay spot and check if there are any boxes in there. If there are, we pick them up and transport them.
         if seek_and_find(last_checked_bay) is not None: #if we found any boxes there
             color = seek_and_find(last_checked_bay)  # get the color of the box
+=======
+        # If the button has been pressed, perform a one‑shot emergency stop:
+        # stop motors and leave the main loop entirely.
+        if emergency_stop:
+            go(0, 0)
+            break
+
+        # Run the actuator initialization cycle once at the start of each round,
+        # then proceed to movement on the next iteration.
+        if not init_distance_unlock:
+            actuator = Actuator(ACTUATOR_DIR_PIN, ACTUATOR_PWM_PIN)
+            loading_pipeline_state_machine.initialize_actuator(actuator)
+            init_distance_unlock = True
+            # Go back to the top of the loop; next iteration will do movement.
+            continue
+
+        # Move to the last loading bay spot and check for boxes.
+        go_to(last_checked_bay)
+
+        found_color = seek_and_find(last_checked_bay)
+        if found_color is not None:  # if we found any boxes there
+            color = found_color  # get the color of the box
+>>>>>>> 28464cc (Update main, loading pipeline state machine, and tests)
             delivery_area = color_to_vertex(color)  # map color to vertex
             go_to(delivery_area)  # go to delivery area
             boxes_delivered += 1 # increment boxes delivered
@@ -609,10 +725,15 @@ def main():
         else:
             number_of_bay = (number_of_bay + 1) % len(loading_bays) # set target to next bay
 
+        # Prepare for the next round: force the next loop iteration to
+        # run the actuator initialization cycle again.
+        init_distance_unlock = False
+
 
     go_to(V.START)
     go(0,0)
 
+<<<<<<< HEAD
 
 
 
@@ -660,6 +781,8 @@ def unload_robot():
     print("Unloading complete")
 
 
+=======
+>>>>>>> 28464cc (Update main, loading pipeline state machine, and tests)
 # if __name__ == "__main__":
 #     unload_robot()
 

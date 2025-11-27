@@ -32,7 +32,7 @@ except ImportError as e:
 #         "'VL53L0X' is defined inside it."
 #     )
 
-def setup_sensor():
+def setup_sensor_vl53l0x():
     i2c_bus = I2C(id=I2C_ID, sda=Pin(PIN_SDA), scl=Pin(PIN_SCL))
 
     # class lives inside the module as VL53L0X.VL53L0Xclass
@@ -49,7 +49,7 @@ def vl53l0x_read_distance(sensor) -> int:
     return sensor.read()
 
 def main():
-    sensor = setup_sensor()
+    sensor = setup_sensor_vl53l0x()
     
     while True:
         try:

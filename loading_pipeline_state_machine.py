@@ -20,24 +20,24 @@ PIN_SCL_TCS3472 = 11
 
 # TCS3472 power control
 COLOR_POWER_PIN = 0
-COLOR_POWER_STABILIZE_MS = 200
-COLOR_INTEGRATION_MS = 500
+COLOR_POWER_STABILIZE_MS = 2000
+COLOR_INTEGRATION_MS =2000
 
 # Actuator pins
 ACTUATOR_DIR_PIN = 3
 ACTUATOR_PWM_PIN = 2
 
 # Timing constants
-INIT_RETRACT_TIME = 6.0  # Retract to bottommost position
-ZONE_DOWN_EXTEND_TIME = 3.0  # Extend to default position for zone_down
-ZONE_UP_EXTEND_TIME = 0  # Extend to default position for zone_up
+INIT_RETRACT_TIME = 5.0  # Retract to bottommost position
+ZONE_DOWN_EXTEND_TIME = 6 # Extend to default position for zone_down
+ZONE_UP_EXTEND_TIME = 6  # Extend to default position for zone_up
 LIFT_TIME = 3.0  # Base lift time when starting loading
 ACTUATOR_SPEED = 50
 
 MIN_INIT_DISTANCE_CM = 5
 ZONE_PRESET_DISTANCE_CM = 10.0 # Trigger zone preset extend
-COLOR_REFERENCE_DISTANCE_CM = 3.0  # Trigger color sampling
-LIFT_REFERENCE_DISTANCE_CM = 2.0  # Trigger lift phase
+COLOR_REFERENCE_DISTANCE_CM = 5  # Trigger color sampling
+LIFT_REFERENCE_DISTANCE_CM = 3 # Trigger lift phase
 LOOP_DELAY = 0.2
 
 def get_zone_extend_time(zone=LOADING_ZONE):
@@ -136,11 +136,15 @@ class LoadingPipelineState:
         self.reset_cycle_flags()
 
     def reset_cycle_flags(self):
-        self.actuator_initialized_cycle = False
+        # In this version we assume the actuator has already been
+        # mechanically initialised by higher‑level code (e.g. main.py),
+        # so we start each cycle "unlocked" and ready to run the colour
+        # + lift phases as soon as distance thresholds are met.
+        self.actuator_initialized_cycle = True
         self.color_sampled = False
         self.lift_triggered = False
         self.detected_color = None
-        self.init_distance_unlock = False
+        self.init_distance_unlock = True
 
 
 def _maybe_delay(state):
@@ -156,34 +160,19 @@ def pipeline_step(state):
     """
     dist_cm = read_distance_cm(state.tmf8701)
 
+    # Only treat 'None' as no data; accept 0 or any numeric value so
+    # the state machine can still progress with your real sensor output.
     if dist_cm is None:
         print("Distance: -- waiting for sensor data")
         _maybe_delay(state)
         return "waiting_sensor"
 
-    if dist_cm >= MIN_INIT_DISTANCE_CM and not state.init_distance_unlock:
-        print(
-            "Distance {:.2f} cm >= minimum init distance {} cm. Init unlocked."
-            .format(dist_cm, MIN_INIT_DISTANCE_CM)
-        )
-        state.init_distance_unlock = True
-        _maybe_delay(state)
-        return "init_unlocked"
-
-    if (
-        dist_cm <= ZONE_PRESET_DISTANCE_CM
-        and state.init_distance_unlock
-        and not state.actuator_initialized_cycle
-    ):
-        print("Distance within {} cm. Initializing actuator.".format(ZONE_PRESET_DISTANCE_CM))
-        initialize_actuator(state.actuator, state.loading_zone)
-        state.actuator_initialized_cycle = True
-        _maybe_delay(state)
-        return "actuator_initialized"
+    # Debug: show the raw distance the state machine is seeing
+    print("State machine distance (cm):", dist_cm)
 
     if (
         dist_cm <= COLOR_REFERENCE_DISTANCE_CM
-        and state.actuator_initialized_cycle
+        and state.init_distance_unlock
         and not state.color_sampled
     ):
         light, rgb = sample_color(state.color_power)
@@ -196,7 +185,7 @@ def pipeline_step(state):
 
     if (
         dist_cm <= LIFT_REFERENCE_DISTANCE_CM
-        and state.actuator_initialized_cycle
+        and state.init_distance_unlock
         and state.color_sampled
         and not state.lift_triggered
     ):
@@ -210,7 +199,7 @@ def pipeline_step(state):
         return "lift_triggered"
 
     if dist_cm > ZONE_PRESET_DISTANCE_CM and (
-        state.actuator_initialized_cycle or state.color_sampled or state.lift_triggered
+        state.init_distance_unlock or state.color_sampled or state.lift_triggered
     ):
         print("Object moved out of range. Resetting cycle state.")
         state.reset_cycle_flags()
@@ -222,9 +211,18 @@ def pipeline_step(state):
 
 
 def main():
+    """
+    Standalone runner for the loading pipeline state machine.
+    Runs until a single loading cycle has either completed a lift
+    or been reset, then returns to the caller.
+    """
     state = LoadingPipelineState()
     while True:
-        pipeline_step(state)
+        result = pipeline_step(state)
+        if result in ("lift_triggered", "state_reset"):
+            # One complete cycle done; exit so caller (e.g. main.py)
+            # can continue with the rest of the robot logic.
+            break
 
 if __name__ == "__main__":
     main()
