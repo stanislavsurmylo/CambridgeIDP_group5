@@ -92,6 +92,21 @@ sm_yellow = rp2.StateMachine(0, blink_1hz, freq=2000, set_base=Pin(PIN_YELLOW))
 sm_yellow.active(1)
 
 
+# ----- BUTTON INTERRUPT (EMERGENCY STOP) -----
+button = Pin(BUTTON_PIN, Pin.IN, Pin.PULL_UP)
+emergency_stop = False
+
+def _button_irq(pin):
+    # Keep this very small: just set a flag and stop the motors.
+    global emergency_stop
+    emergency_stop = True
+    mL.stop()
+    mR.stop()
+
+# Trigger on falling edge (button pressed to GND when using pull-up)
+button.irq(trigger=Pin.IRQ_FALLING, handler=_button_irq)
+
+
 # ----- SENSORS (left->right). Swap sFL,sFR wires here if needed -----
 S_FL = Pin(19, Pin.IN)   # front-left  (outer)
 S_BL = Pin(21, Pin.IN)   # back-left   (inner)
