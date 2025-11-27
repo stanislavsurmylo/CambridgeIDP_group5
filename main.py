@@ -241,6 +241,13 @@ def spin_sleep(deg, speed):
 def centered(c):   return c == 0b0110
 def slight_left(c):  return c == 0b0100
 def slight_right(c): return c == 0b0010
+def spin_back(deg):
+    if current_vertex in [V.B_DOWN_BEG, V.B_DOWN_END]:
+        spin_left(BASE)
+        spin_sleep(180, BASE)
+    else:
+        spin_right(BASE)
+        spin_sleep(180, BASE)
 
 
 def path_to_route(path):
@@ -350,8 +357,10 @@ def seek_and_find(LoadingBay):
                     continue
             
         elif loading_stage == 3:
+            
             shift_back_with_correction(delta_tick)
-            spin_right(90)
+            spin_right(BASE)
+            spin_sleep(90, BASE)
             loading_stage = 4
 
         elif loading_stage == 4 and c == 0b1110:
@@ -393,8 +402,7 @@ def complete_route(branch_route):
         spin_left(BASE)
         spin_sleep(90, BASE)
     elif branch_route[branch_index] == 'B':
-        spin_right(BASE)
-        spin_sleep(180, BASE)
+        spin_back(BASE)
     branch_index = 1
 
     turning = None
@@ -574,7 +582,7 @@ def main():
 
     while boxes_delivered < 4:
 
-        # go_to(last_checked_bay) 
+        go_to(last_checked_bay) 
         # we go to last loading bay spot and check if there are any boxes in there. If there are, we pick them up and transport them.
         if seek_and_find(last_checked_bay) is not None: #if we found any boxes there
             color = seek_and_find(last_checked_bay)  # get the color of the box
