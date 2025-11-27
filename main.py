@@ -139,6 +139,7 @@ def read_code():
 def go(vL, vR): mL.fwd(vL); mR.fwd(vR)
 def spin_left(v): mL.bwd(v); mR.fwd(v)
 def spin_right(v): mL.fwd(v); mR.bwd(v)
+def go_back(vL, vR): mL.bwd(vL); mR.bwd(vR)
 
 def shift_with_correction(duration_ms):
     t0 = ticks_ms()
@@ -303,6 +304,7 @@ def seek_and_find(LoadingBay):
     turn_counter = 0
     actuator = Actuator(ACTUATOR_DIR_PIN, ACTUATOR_PWM_PIN)
     loading_pipeline.initialize_actuator(actuator)
+    init_distance_unlock = True
 
     for edge in map.DIRECTED_EDGES:
         if edge.src == LoadingBay and edge.dst in [V.B_DOWN_END, V.A_DOWN_END, V.B_UP_END, V.A_UP_END]:
@@ -362,7 +364,8 @@ def seek_and_find(LoadingBay):
                     continue
             
         elif loading_stage == 3:
-            loading_pipeline_main()#!!!
+            # Run the loading pipeline once we have reached pickup distance
+            loading_pipeline_main()
             shift_back_with_correction(delta_tick)
             spin_right(BASE)
             spin_sleep(90, BASE)

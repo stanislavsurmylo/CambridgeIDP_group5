@@ -147,7 +147,11 @@ def pipeline_main():
 
     # Only run the loading loop when we are in a valid loading zone (1 or 2)
  
-
+def loading_pipeline_main():
+    tmf8701 = setup_sensor_tmf8701()
+    actuator = Actuator(ACTUATOR_DIR_PIN, ACTUATOR_PWM_PIN)
+    color_power = Pin(COLOR_POWER_PIN, Pin.OUT, value=0)
+    
     while True:
         dist_cm = read_distance_cm(tmf8701)
 
@@ -198,6 +202,3 @@ def pipeline_main():
             init_distance_unlock = False
 
         sleep(LOOP_DELAY)
-
-if __name__ == "__main__":
-    pipeline_main()
