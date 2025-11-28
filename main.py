@@ -90,7 +90,7 @@ emergency_stop = False
 button.irq(trigger=Pin.IRQ_FALLING, handler=_button_irq)
 
 #vl53l0x distance sensor:
-setup_sensor1 = setup_sensor_vl53l0x()
+# setup_sensor1 = setup_sensor_vl53l0x()
 
 
 loading_state = LoadingPipelineState()
@@ -164,7 +164,7 @@ TARGET_DISTANCE = 250  # target distance in mm
 COLOUR_DETECTION_DISTANCE = 50  # distance to detect color in mm
 PICKUP_DISTANCE = 30.0  # distance to pick up box in mm
 
-DT_MS = 5
+DT_MS = 10
 
 
 RADIUS_OF_TURN = 16.5  # radius of turn in cm
@@ -372,10 +372,10 @@ def seek_and_find(LoadingBay):
             if turn_counter_on:
                 turn_counter += 1
             turn_counter_on = False
-            sensor_distance1 = vl53l0x_read_distance(setup_sensor1)
-            print("Distance:", sensor_distance1)
-            if sensor_distance1 < TARGET_DISTANCE:
-       
+            # sensor_distance1 = vl53l0x_read_distance(setup_sensor1)
+            # print("Distance:", sensor_distance1)
+            # if sensor_distance1 < TARGET_DISTANCE:
+            if True:
                 # tick1 = ticks_ms()
                 # if tick1 - tick0 > 50:
                 loading_stage = 1
@@ -694,7 +694,7 @@ def main():
             continue
 
         # Move to the last loading bay spot and check for boxes.
-        # go_to(last_checked_bay)
+        go_to(last_checked_bay)
 
         found_color = seek_and_find(last_checked_bay)
         if found_color is not None:  # if we found any boxes there
