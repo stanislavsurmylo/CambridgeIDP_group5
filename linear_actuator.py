@@ -25,7 +25,7 @@ class Actuator:
 
 DIR_PIN = 3
 PWM_PIN = 2
-TEST_DURATION = 5  # 1 second for testing
+TEST_DURATION = 6.5  # 1 second for testing
 
 def unload_robot():
 

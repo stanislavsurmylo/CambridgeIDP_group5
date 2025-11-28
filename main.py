@@ -64,17 +64,17 @@ def blink_1hz():
     nop()                  [29]
     jmp(x_dec, "delay_low")
 
-def unload_robot():
-    go(0,0)
-    # Unloading robot to reduce weight on actuator
-    actuator = Actuator(ACTUATOR_DIR_PIN, ACTUATOR_PWM_PIN)
+# def unload_robot():
+#     go(0,0)
+#     # Unloading robot to reduce weight on actuator
+#     actuator = Actuator(ACTUATOR_DIR_PIN, ACTUATOR_PWM_PIN)
     
-    # Test retract
-    actuator.retract(speed=100)
-    sleep(1)
-    actuator.stop()
-    sleep(1)  # Pause so you can measure
-    print("Unloading complete")
+#     # Test retract
+#     actuator.retract(speed=100)
+#     sleep(1)
+#     actuator.stop()
+#     sleep(1)  # Pause so you can measure
+#     print("Unloading complete")
 
 def _button_irq(pin):
     # One‑shot emergency stop: once pressed, latch stop state.
@@ -129,7 +129,7 @@ def W(x): return x == WHITE_LEVEL
 # branch_route = []  path = list of vertices; route = list of 'L','R','F','B'
 # branch_index = 0
 current_heading = 0
-current_vertex = V.B_DOWN_BEG
+current_vertex = V.START
 finish_vertex = None
 finish_heading = None
 
@@ -151,10 +151,10 @@ mL = Motor(4,5, INVERT_LEFT)
 mR = Motor(7,6, INVERT_RIGHT)
 
 # ----- TUNING -----
-BASE  = 40    # straight speed
+BASE  = 50    # straight speed
 SEEK_COEFF = 0.5  # how aggressively to seek line
-DELTA = 15    # small correction to reach 0110
-HARD  = 25    # strong correction when far(turns)
+DELTA = 17    # small correction to reach 0110
+HARD  = 30    # strong correction when far(turns)
 TURN_OUT = 100 # arc outer wheel speed
 TURN_IN  = 0 # arc inner wheel speed
 DEBOUNCE = 3  # front trigger must persist N cycles
@@ -350,11 +350,14 @@ def path_to_route(path):
     return route
 
 
+
+
+
 def seek_and_find(LoadingBay):
     global current_heading
     global current_vertex
     global emergency_stop
-    colour = None 
+    colour = 'GREEN'
     loading_stage = 0
     turn_counter_on = True
     turn_counter = 0
@@ -418,7 +421,9 @@ def seek_and_find(LoadingBay):
         elif loading_stage == 3:
             # Run the loading pipeline state machine until it either
             # completes a lift or decides to reset the cycle.
+            global loading_state
             go(0,0)
+            sleep_ms(500)
 
             while True:
                 result = pipeline_step(loading_state)
@@ -440,11 +445,11 @@ def seek_and_find(LoadingBay):
                 print('1')
                 spin_right(BASE)
                 print('2')
-                spin_sleep(90, BASE)
+                spin_sleep(95, BASE)
                 print('3')
             if current_vertex in [V.B_DOWN_BEG]:
                 spin_left(BASE)
-                spin_sleep(90, BASE)
+                spin_sleep(95, BASE)
 
             turn_counter = 8 - turn_counter
 
@@ -656,10 +661,16 @@ number_of_bay = 0
 last_checked_bay = loading_bays[0]
 
 def color_to_vertex(color: str) -> V:
-    try:
-        return V[color.upper()]   # uses enum name lookup
-    except KeyError:
-        raise ValueError(f"Unknown color: {color!r}")
+    """
+    Map a color string (e.g. 'red') to the corresponding V enum member.
+
+    MicroPython's slim IntEnum fallback doesn't support subscription (V['RED']),
+    so we use getattr-style lookup instead.
+    """
+    key = str(color).upper()
+    if hasattr(V, key):
+        return getattr(V, key)
+    raise ValueError(f"Unknown color: {color!r}")
 
 
 from linear_actuator import unload_robot
@@ -705,20 +716,24 @@ def main():
 
         # Move to the last loading bay spot and check for boxes.
         # go_to(last_checked_bay)
-        print('1')
+        # print('1')
 
-        found_color = seek_and_find(last_checked_bay)
-        print("Found color:", found_color)
+        # found_color = seek_and_find(last_checked_bay)
+        found_color = 0
+        # print("Found color:", found_color)
         if found_color is not None:  # if we found any boxes there
-            print('2')
-            color = found_color  # get the color of the box
-            print('3')
-            delivery_area = color_to_vertex(color)  # map color to vertex
-            print('4')
-            print("Delivering to:", delivery_area)
-            go_to(delivery_area)  # go to delivery area
-            boxes_delivered += 1 # increment boxes delivered
-            # unload_robot() # unload any boxes we have
+            # print('2')
+            # color = found_color  # get the color of the box
+            # print('3')
+            # delivery_area = color_to_vertex(color)  # map color to vertex
+            # print('4')
+            # print("Delivering to:", delivery_area)
+            # go_to(delivery_area)  # go to delivery area
+            # boxes_delivered += 1 # increment boxes delivered
+            # shift_with_correction((16//5.5)*((950//BASE)*40))
+            go(0,0)
+            unload_robot() # unload any boxes we have
+            shift_back_with_correction((8//5.5)*((950//BASE)*40))
         else:
             number_of_bay = (number_of_bay + 1) % len(loading_bays) # set target to next bay
 

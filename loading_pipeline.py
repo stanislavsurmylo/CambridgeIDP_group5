@@ -204,3 +204,5 @@ def loading_pipeline_main():
             init_distance_unlock = False
 
         sleep(LOOP_DELAY)
+
+    return detected_color
