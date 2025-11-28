@@ -1,25 +1,16 @@
 # four_sensor_table_arc.py — 4-bit follower + debounced arc turns
 import loading_pipeline_state_machine
-import loading_pipeline_state_machine
 from machine import Pin, PWM, I2C
-from time import sleep_ms, ticks_ms, ticks_diff, sleep
-import rp2
 from time import sleep_ms, ticks_ms, ticks_diff, sleep
 import rp2
 import map
 from map import V
 import vl53l0x_distance
 from vl53l0x_distance import setup_sensor_vl53l0x, vl53l0x_read_distance
-from vl53l0x_distance import setup_sensor_vl53l0x, vl53l0x_read_distance
 from libs.tmf8701 import DFRobot_TMF8701
-from linear_actuator import Actuator
 from linear_actuator import Actuator
 import loading_pipeline
 from loading_pipeline import loading_pipeline_main
-from loading_pipeline_state_machine import LoadingPipelineState, pipeline_step
-
-PIN_YELLOW = 17
-BUTTON_PIN = 14 
 from loading_pipeline_state_machine import LoadingPipelineState, pipeline_step
 
 PIN_YELLOW = 17
@@ -55,8 +46,6 @@ ACTUATOR_SPEED = 50
 
 MIN_INIT_DISTANCE_CM = 5
 ZONE_PRESET_DISTANCE_CM = 10.0 # Trigger zone preset extend
-COLOR_REFERENCE_DISTANCE_CM = 5  # Trigger color sampling
-LIFT_REFERENCE_DISTANCE_CM = 3  # Trigger lift phase
 COLOR_REFERENCE_DISTANCE_CM = 5  # Trigger color sampling
 LIFT_REFERENCE_DISTANCE_CM = 3  # Trigger lift phase
 LOOP_DELAY = 0.2
@@ -100,47 +89,8 @@ button = Pin(BUTTON_PIN, Pin.IN, Pin.PULL_UP)
 emergency_stop = False
 button.irq(trigger=Pin.IRQ_FALLING, handler=_button_irq)
 
-@rp2.asm_pio(set_init=rp2.PIO.OUT_LOW)
-def blink_1hz():
-    set(pins, 1)           # LED ON
-    set(x, 31)             [6]
-    label("delay_high")
-    nop()                  [29]
-    jmp(x_dec, "delay_high")
-
-    set(pins, 0)           # LED OFF
-    set(x, 31)             [6]
-    label("delay_low")
-    nop()                  [29]
-    jmp(x_dec, "delay_low")
-
-def unload_robot():
-    go(0,0)
-    # Unloading robot to reduce weight on actuator
-    actuator = Actuator(ACTUATOR_DIR_PIN, ACTUATOR_PWM_PIN)
-    
-    # Test retract
-    actuator.retract(speed=100)
-    sleep(1)
-    actuator.stop()
-    sleep(1)  # Pause so you can measure
-    print("Unloading complete")
-
-def _button_irq(pin):
-    # One‑shot emergency stop: once pressed, latch stop state.
-    # Keep this very small: just set a flag and stop the motors.
-    global emergency_stop
-    emergency_stop = True
-    mL.stop()
-    mR.stop()
-
-# Trigger on falling edge (button pressed to GND when using pull-up)
-button = Pin(BUTTON_PIN, Pin.IN, Pin.PULL_UP)
-emergency_stop = False
-button.irq(trigger=Pin.IRQ_FALLING, handler=_button_irq)
-
 #vl53l0x distance sensor:
-setup_sensor1 = setup_sensor_vl53l0x()
+# setup_sensor1 = setup_sensor_vl53l0x()
 
 
 loading_state = LoadingPipelineState()
@@ -178,8 +128,8 @@ def W(x): return x == WHITE_LEVEL
 
 # branch_route = []  path = list of vertices; route = list of 'L','R','F','B'
 # branch_index = 0
-current_heading = 1
-current_vertex = V.RIGHT
+current_heading = 0
+current_vertex = V.B_DOWN_BEG
 finish_vertex = None
 finish_heading = None
 
@@ -214,7 +164,7 @@ TARGET_DISTANCE = 250  # target distance in mm
 COLOUR_DETECTION_DISTANCE = 50  # distance to detect color in mm
 PICKUP_DISTANCE = 30.0  # distance to pick up box in mm
 
-DT_MS = 5
+DT_MS = 10
 
 
 RADIUS_OF_TURN = 16.5  # radius of turn in cm
@@ -242,12 +192,8 @@ def go_back(vL, vR): mL.bwd(vL); mR.bwd(vR)
 
 def shift_with_correction(duration_ms):
     global emergency_stop
-    global emergency_stop
     t0 = ticks_ms()
     while ticks_diff(ticks_ms(), t0) < duration_ms:
-        if emergency_stop:
-            go(0, 0)
-            break
         if emergency_stop:
             go(0, 0)
             break
@@ -271,25 +217,24 @@ def shift_with_correction(duration_ms):
 
 def shift_back_with_correction(duration_ms):
     global emergency_stop
-    global emergency_stop
     t0 = ticks_ms()
     while ticks_diff(ticks_ms(), t0) < duration_ms:
         if emergency_stop:
             go(0, 0)
             break
-        if emergency_stop:
-            go(0, 0)
-            break
-        c = read_code()
+        go_back(BASE, BASE)
+        # c = read_code()
 
-        if centered(c):
-            go_back(BASE, BASE)
-        elif c in (0b1100, 0b1000):   # far to left
-            go_back(BASE, BASE-10)
-            go_back(BASE, BASE-10)
-        elif c in (0b0011, 0b0001):   # far to right
-            go_back(BASE, BASE+10)
-            go_back(BASE, BASE+10)
+        # if centered(c):
+        #     go_back(BASE, BASE)
+        # elif slight_left(c):          # call the function
+        #     go_back(BASE - DELTA, BASE + DELTA)
+        # elif slight_right(c):         # call the function
+        #     go_back(BASE + DELTA, BASE - DELTA)
+        # elif c in (0b1100, 0b1000):   # far to left
+        #     go_back(BASE - HARD, BASE + HARD)
+        # elif c in (0b0011, 0b0001):   # far to right
+        #     go_back(BASE + HARD, BASE - HARD)
 
         sleep_ms(DT_MS)
 
@@ -334,8 +279,7 @@ def arc(side):
     return add_branch_index
 
 def go_spin(deg, speed):
-    shift_with_correction(950)  # move forward length of line
-    shift_with_correction(950)  # move forward length of line
+    shift_with_correction((950//BASE)*40)  # move forward length of line
     spin_left(speed)   # inner slower
     spin_sleep(deg, speed)
 
@@ -343,8 +287,7 @@ def go_spin(deg, speed):
 
 def turn_sleep(deg, speed):
     distance = (deg / 180) * 3.14 * RADIUS_OF_TURN  # distance to travel
-    time_ms = (distance / (speed * 0.25)) * 1
-    000  # time in ms
+    time_ms = (distance / (speed * 0.25)) * 1000 # time in ms
     sleep_ms(int(time_ms))
 
 def spin_sleep(deg, speed):
@@ -411,7 +354,6 @@ def seek_and_find(LoadingBay):
     global current_heading
     global current_vertex
     global emergency_stop
-    global emergency_stop
     colour = None 
     loading_stage = 0
     turn_counter_on = True
@@ -423,16 +365,13 @@ def seek_and_find(LoadingBay):
                 spin_sleep(180, BASE)
     
     while turn_counter < 7 and not emergency_stop:
-    while turn_counter < 7 and not emergency_stop:
         c = read_code()
-        print("loading stage:",loading_stage, "turn_counter:", turn_counter)
         print("loading stage:",loading_stage, "turn_counter:", turn_counter)
         FL = (c>>3)&1;  FR = c&1
         mid = (c>>1)&0b11  # inner pair
                 # If all four see white: follow the next route directive
         #print(branch_index)
         
-        if (c == 0b1110 or c == 0b1111) and loading_stage == 0:
         if (c == 0b1110 or c == 0b1111) and loading_stage == 0:
             if turn_counter_on:
                 turn_counter += 1
@@ -479,12 +418,7 @@ def seek_and_find(LoadingBay):
         elif loading_stage == 3:
             # Run the loading pipeline state machine until it either
             # completes a lift or decides to reset the cycle.
-            global loading_state
-            # Run the loading pipeline state machine until it either
-            # completes a lift or decides to reset the cycle.
-            global loading_state
             go(0,0)
-            sleep(0.5)
 
             while True:
                 result = pipeline_step(loading_state)
@@ -501,34 +435,24 @@ def seek_and_find(LoadingBay):
                 # Any unexpected result: break to avoid hanging
                 break
 
+            shift_back_with_correction((16//5.5)*((950//BASE)*40))
+            if current_vertex in [V.A_DOWN_BEG]:
+                print('1')
+                spin_right(BASE)
+                print('2')
+                spin_sleep(90, BASE)
+                print('3')
+            if current_vertex in [V.B_DOWN_BEG]:
+                spin_left(BASE)
+                spin_sleep(90, BASE)
 
-            while True:
-                result = pipeline_step(loading_state)
-                print("Loading pipeline step result:", result)
+            turn_counter = 8 - turn_counter
 
-                # "waiting_sensor" and "monitoring" mean just keep polling
-                if result in ("waiting_sensor", "monitoring", "init_unlocked", "actuator_initialized", "color_sampled"):
-                    continue
-
-                # Stop once the lift is done or the state machine resets
-                if result in ("lift_triggered", "state_reset"):
-                    break
-
-                # Any unexpected result: break to avoid hanging
-                break
-
-            sleep(0.5)
-            shift_back_with_correction(delta_tick)
             
-            
-            spin_right(BASE)
-            spin_sleep(90, BASE)
             loading_stage = 4
 
 
-        elif loading_stage == 4 and (c == 0b1110 or c == 0b1111):
-
-        elif loading_stage == 4 and (c == 0b1110 or c == 0b1111):
+        elif loading_stage == 4 and (c == 0b1110 or c == 0b1111 or c == 0b0111):
             if turn_counter_on:
                 turn_counter += 1
                 turn_counter_on = False
@@ -548,22 +472,17 @@ def seek_and_find(LoadingBay):
             go(BASE+HARD, BASE-HARD)
         else:
             # unknown/lost -> gentle bias to move forward
-            go(BASE, BASE-10)
+            go(BASE, BASE)
         sleep_ms(DT_MS)
-    if current_vertex == V.B_DOWN_BEG:
-        current_vertex = V.B_DOWN_END
-    elif current_vertex == V.B_UP_BEG:
-        current_vertex = V.B_UP_END
-    elif current_vertex == V.A_UP_BEG:
-        current_vertex = V.A_UP_END
-    elif current_vertex == V.A_DOWN_BEG:
+    if current_vertex == V.A_DOWN_BEG:
         current_vertex = V.A_DOWN_END
+    elif current_vertex == V.B_DOWN_BEG:
+        current_heading = 2
     return colour
 
 def complete_route(branch_route):
     global current_heading
     global current_vertex
-    global emergency_stop
     global emergency_stop
     branch_index = 0
 
@@ -582,7 +501,6 @@ def complete_route(branch_route):
     stable = 0
     t0 = 0
     while (branch_index < len(branch_route) or not centered(read_code())) and not emergency_stop:
-    while (branch_index < len(branch_route) or not centered(read_code())) and not emergency_stop:
         #print(current_heading)
         c = read_code()
         #print("Code:",bin(c))
@@ -594,12 +512,14 @@ def complete_route(branch_route):
         if c == 0b1111:
             # if we ran out of directives, default to 'F'
             action = branch_route[branch_index] if branch_index < len(branch_route) else 'X'
-
+            print('1')
             if action == 'L':
+                print('2')
                 turning = 'L'
                 t0 = ticks_ms()
                 branch_index += arc('L')                 # branch_index += arc() will consume this route entry
                 sleep_ms(DT_MS)
+                print('3')
                 continue
 
             elif action == 'R':
@@ -760,16 +680,6 @@ def main():
 
     sm_yellow = rp2.StateMachine(0, blink_1hz, freq=2000, set_base=Pin(PIN_YELLOW))
     sm_yellow.active(1)
-    global emergency_stop
-    global init_distance_unlock
-
-    # This flag controls whether we've already run the actuator init
-    # cycle for the current round. It is reset at the end of each loop
-    # so that every round starts with a fresh init cycle.
-    init_distance_unlock = False
-
-    sm_yellow = rp2.StateMachine(0, blink_1hz, freq=2000, set_base=Pin(PIN_YELLOW))
-    sm_yellow.active(1)
 
     actuator = Actuator(ACTUATOR_DIR_PIN, ACTUATOR_PWM_PIN)
     # loading_pipeline.initialize_actuator(actuator)
@@ -790,26 +700,27 @@ def main():
             loading_pipeline_state_machine.initialize_actuator(actuator)
             init_distance_unlock = True
             # Go back to the top of the loop; next iteration will do movement.
+            print('0')
             continue
 
         # Move to the last loading bay spot and check for boxes.
         # go_to(last_checked_bay)
+        print('1')
 
         found_color = seek_and_find(last_checked_bay)
+        print("Found color:", found_color)
         if found_color is not None:  # if we found any boxes there
+            print('2')
             color = found_color  # get the color of the box
+            print('3')
             delivery_area = color_to_vertex(color)  # map color to vertex
-            print("Delivering to:", delivery_area)
+            print('4')
             print("Delivering to:", delivery_area)
             go_to(delivery_area)  # go to delivery area
             boxes_delivered += 1 # increment boxes delivered
-            unload_robot() # unload any boxes we have
+            # unload_robot() # unload any boxes we have
         else:
             number_of_bay = (number_of_bay + 1) % len(loading_bays) # set target to next bay
-
-        # Prepare for the next round: force the next loop iteration to
-        # run the actuator initialization cycle again.
-        init_distance_unlock = False
 
         # Prepare for the next round: force the next loop iteration to
         # run the actuator initialization cycle again.

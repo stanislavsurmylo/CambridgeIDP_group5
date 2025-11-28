@@ -29,8 +29,8 @@ ACTUATOR_PWM_PIN = 2
 
 # Timing constants
 INIT_RETRACT_TIME = 5.0  # Retract to bottommost position
-ZONE_DOWN_EXTEND_TIME = 6 # Extend to default position for zone_down
-ZONE_UP_EXTEND_TIME = 6  # Extend to default position for zone_up
+ZONE_DOWN_EXTEND_TIME = 6.3 # Extend to default position for zone_down
+ZONE_UP_EXTEND_TIME = 6.3  # Extend to default position for zone_up
 LIFT_TIME = 3.0  # Base lift time when starting loading
 ACTUATOR_SPEED = 50
 
