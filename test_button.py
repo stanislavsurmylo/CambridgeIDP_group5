@@ -34,5 +34,3 @@ try:
         sleep(0.1)
 except KeyboardInterrupt:
     print("Stopped button test.")
-
-

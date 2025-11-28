@@ -1,16 +1,12 @@
 # four_sensor_table_arc.py — 4-bit follower + debounced arc turns
 import loading_pipeline_state_machine
 from machine import Pin, PWM, I2C
-<<<<<<< HEAD
-from time import sleep_ms, ticks_ms, ticks_diff
-=======
 from time import sleep_ms, ticks_ms, ticks_diff, sleep
 import rp2
->>>>>>> 28464cc (Update main, loading pipeline state machine, and tests)
 import map
 from map import V
 import vl53l0x_distance
-from vl53l0x_distance import setup_sensor, vl53l0x_read_distance
+from vl53l0x_distance import setup_sensor_vl53l0x, vl53l0x_read_distance
 from libs.tmf8701 import DFRobot_TMF8701
 from linear_actuator import Actuator
 import loading_pipeline
@@ -54,8 +50,6 @@ COLOR_REFERENCE_DISTANCE_CM = 5  # Trigger color sampling
 LIFT_REFERENCE_DISTANCE_CM = 3  # Trigger lift phase
 LOOP_DELAY = 0.2
 
-<<<<<<< HEAD
-=======
 @rp2.asm_pio(set_init=rp2.PIO.OUT_LOW)
 def blink_1hz():
     set(pins, 1)           # LED ON
@@ -95,9 +89,8 @@ button = Pin(BUTTON_PIN, Pin.IN, Pin.PULL_UP)
 emergency_stop = False
 button.irq(trigger=Pin.IRQ_FALLING, handler=_button_irq)
 
->>>>>>> 28464cc (Update main, loading pipeline state machine, and tests)
 #vl53l0x distance sensor:
-setup_sensor1 = setup_sensor()
+setup_sensor1 = setup_sensor_vl53l0x()
 
 
 loading_state = LoadingPipelineState()
@@ -171,7 +164,7 @@ TARGET_DISTANCE = 250  # target distance in mm
 COLOUR_DETECTION_DISTANCE = 50  # distance to detect color in mm
 PICKUP_DISTANCE = 30.0  # distance to pick up box in mm
 
-DT_MS = 20
+DT_MS = 5
 
 
 RADIUS_OF_TURN = 16.5  # radius of turn in cm
@@ -281,7 +274,7 @@ def arc(side):
     return add_branch_index
 
 def go_spin(deg, speed):
-    shift_with_correction(1000)  # move forward length of line
+    shift_with_correction(950)  # move forward length of line
     spin_left(speed)   # inner slower
     spin_sleep(deg, speed)
 
@@ -369,13 +362,13 @@ def seek_and_find(LoadingBay):
     
     while turn_counter < 7 and not emergency_stop:
         c = read_code()
-        print("loading stage:",loading_stage)
+        print("loading stage:",loading_stage, "turn_counter:", turn_counter)
         FL = (c>>3)&1;  FR = c&1
         mid = (c>>1)&0b11  # inner pair
                 # If all four see white: follow the next route directive
         #print(branch_index)
         
-        if c == 0b1110 and loading_stage == 0:
+        if (c == 0b1110 or c == 0b1111) and loading_stage == 0:
             if turn_counter_on:
                 turn_counter += 1
             turn_counter_on = False
@@ -419,12 +412,6 @@ def seek_and_find(LoadingBay):
                     continue
             
         elif loading_stage == 3:
-<<<<<<< HEAD
-            # Run the loading pipeline once we have reached pickup distance
-            go(0,0)
-            sleep(0.5)
-            loading_pipeline_main()
-=======
             # Run the loading pipeline state machine until it either
             # completes a lift or decides to reset the cycle.
             global loading_state
@@ -446,14 +433,15 @@ def seek_and_find(LoadingBay):
                 # Any unexpected result: break to avoid hanging
                 break
 
->>>>>>> 28464cc (Update main, loading pipeline state machine, and tests)
             sleep(0.5)
             shift_back_with_correction(delta_tick)
+            
             spin_right(BASE)
             spin_sleep(90, BASE)
             loading_stage = 4
 
-        elif loading_stage == 4 and c == 0b1110:
+
+        elif loading_stage == 4 and (c == 0b1110 or c == 0b1111):
             if turn_counter_on:
                 turn_counter += 1
                 turn_counter_on = False
@@ -690,12 +678,6 @@ def main():
 
     while boxes_delivered < 4:
 
-<<<<<<< HEAD
-        # go_to(last_checked_bay) 
-        # we go to last loading bay spot and check if there are any boxes in there. If there are, we pick them up and transport them.
-        if seek_and_find(last_checked_bay) is not None: #if we found any boxes there
-            color = seek_and_find(last_checked_bay)  # get the color of the box
-=======
         # If the button has been pressed, perform a one‑shot emergency stop:
         # stop motors and leave the main loop entirely.
         if emergency_stop:
@@ -712,13 +694,13 @@ def main():
             continue
 
         # Move to the last loading bay spot and check for boxes.
-        go_to(last_checked_bay)
+        # go_to(last_checked_bay)
 
         found_color = seek_and_find(last_checked_bay)
         if found_color is not None:  # if we found any boxes there
             color = found_color  # get the color of the box
->>>>>>> 28464cc (Update main, loading pipeline state machine, and tests)
             delivery_area = color_to_vertex(color)  # map color to vertex
+            print("Delivering to:", delivery_area)
             go_to(delivery_area)  # go to delivery area
             boxes_delivered += 1 # increment boxes delivered
             unload_robot() # unload any boxes we have
@@ -733,56 +715,6 @@ def main():
     go_to(V.START)
     go(0,0)
 
-<<<<<<< HEAD
-
-
-
-from machine import Pin, PWM
-from utime import sleep
-
-class Actuator:
-    def __init__(self, dirPin, PWMPin):
-        self.mDir = Pin(dirPin, Pin.OUT)  # set motor direction pin
-        self.pwm = PWM(Pin(PWMPin))  # set motor pwm pin
-        self.pwm.freq(1000)  # set PWM frequency
-        self.pwm.duty_u16(0)  # set duty cycle - 0=off
-           
-    def set(self, dir, speed):
-        self.mDir.value(dir)                     # forward = 0 reverse = 1 motor
-        self.pwm.duty_u16(int(65535 * speed / 100))  # speed range 0-100 motor
-    
-    def stop(self):
-        self.pwm.duty_u16(0)  # Stop the actuator
-    
-    def extend(self, speed=50):
-        """Extend the actuator at specified speed (0-100)"""
-        self.set(dir=0, speed=speed)
-    
-    def retract(self, speed=50):
-        """Retract the actuator at specified speed (0-100)"""
-        self.set(dir=1, speed=speed)
-
-DIR_PIN = 3
-PWM_PIN = 2
-TEST_DURATION = 1.0  # 1 second for testing
-
-def unload_robot():
-
-    go(0,0)
-    # Unloading robot to reduce weight on actuator
-    actuator = Actuator(DIR_PIN, PWM_PIN)
-    
-    # Test retract
-    actuator.retract(speed=100)
-    sleep(2)
-    actuator.stop()
-    sleep(1)  # Pause so you can measure
-    
-    print("Unloading complete")
-
-
-=======
->>>>>>> 28464cc (Update main, loading pipeline state machine, and tests)
 # if __name__ == "__main__":
 #     unload_robot()
 

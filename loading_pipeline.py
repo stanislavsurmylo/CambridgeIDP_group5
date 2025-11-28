@@ -49,7 +49,6 @@ def get_zone_extend_time():
     return 0.0
     
 def initialize_actuator(actuator):
-<<<<<<< HEAD
     # actuator.retract(speed=100)  # Maximum speed
     # sleep(INIT_RETRACT_TIME)
     # actuator.stop()
@@ -60,7 +59,6 @@ def initialize_actuator(actuator):
     
     print("Setting default position for zone {} (extending for {} seconds)...".format(LOADING_ZONE, 6))
     actuator.retract(speed=ACTUATOR_SPEED)
-=======
     actuator.retract(speed=100)  # Maximum speed
     sleep(INIT_RETRACT_TIME)
     actuator.stop()
@@ -70,7 +68,6 @@ def initialize_actuator(actuator):
     zone_extend_time = get_zone_extend_time()
     print("Setting default position for zone {} (extending for {} seconds)...".format(LOADING_ZONE, zone_extend_time))
     actuator.extend(speed=ACTUATOR_SPEED)
->>>>>>> 28464cc (Update main, loading pipeline state machine, and tests)
     sleep(6)
     actuator.stop()
     sleep(0.1)
