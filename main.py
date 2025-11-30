@@ -50,6 +50,37 @@ COLOR_REFERENCE_DISTANCE_CM = 5  # Trigger color sampling
 LIFT_REFERENCE_DISTANCE_CM = 3  # Trigger lift phase
 LOOP_DELAY = 0.2
 
+
+# ----- TUNING -----
+BASE  = 50    # straight speed
+SPIN_BASE = 50
+LOAD_BASE = 40
+SEEK_COEFF = 0.5  # how aggressively to seek line
+DELTA = 17    # small correction to reach 0110
+HARD  = 30    # strong correction when far(turns)
+TURN_OUT = 100 # arc outer wheel speed
+TURN_IN  = 0 # arc inner wheel speed
+DEBOUNCE = 3  # front trigger must persist N cycles
+STABLE   = 1  # need N centered readings to finish a turn
+MAX_TURN_MS = 10                                                 
+TARGET_DISTANCE = 250  # target distance in mm   
+COLOUR_DETECTION_DISTANCE = 50  # distance to detect color in mm
+PICKUP_DISTANCE = 40.0  # distance to pick up box in mm
+
+DT_MS = 10
+
+
+RADIUS_OF_TURN = 16.5  # radius of turn in cm
+
+    # Radius of turn = 16.5 cm
+    # Angle is 90 degrees
+    # turn distance is (π * 16.5) / 2 = 25.9 cm
+    # Speed is 15 cm/F at power 60
+    #  At power 100, speed is 25 cm/F
+    # Time to turn 25.9 cm at 25 cm/F = 1.036 F
+
+
+
 @rp2.asm_pio(set_init=rp2.PIO.OUT_LOW)
 def blink_1hz():
     set(pins, 1)           # LED ON
@@ -150,33 +181,6 @@ class Motor:
 mL = Motor(4,5, INVERT_LEFT)
 mR = Motor(7,6, INVERT_RIGHT)
 
-# ----- TUNING -----
-BASE  = 50    # straight speed
-SPIN_BASE = 50
-LOAD_BASE = 40
-SEEK_COEFF = 0.5  # how aggressively to seek line
-DELTA = 17    # small correction to reach 0110
-HARD  = 30    # strong correction when far(turns)
-TURN_OUT = 100 # arc outer wheel speed
-TURN_IN  = 0 # arc inner wheel speed
-DEBOUNCE = 3  # front trigger must persist N cycles
-STABLE   = 1  # need N centered readings to finish a turn
-MAX_TURN_MS = 10                                                 
-TARGET_DISTANCE = 250  # target distance in mm   
-COLOUR_DETECTION_DISTANCE = 50  # distance to detect color in mm
-PICKUP_DISTANCE = 30.0  # distance to pick up box in mm
-
-DT_MS = 10
-
-
-RADIUS_OF_TURN = 16.5  # radius of turn in cm
-
-    # Radius of turn = 16.5 cm
-    # Angle is 90 degrees
-    # turn distance is (π * 16.5) / 2 = 25.9 cm
-    # Speed is 15 cm/F at power 60
-    #  At power 100, speed is 25 cm/F
-    # Time to turn 25.9 cm at 25 cm/F = 1.036 F
 
 def read_code():
     # return 4-bit left->right
@@ -302,7 +306,7 @@ def centered(c):   return c == 0b0110
 def slight_left(c):  return c == 0b0100
 def slight_right(c): return c == 0b0010
 def spin_back(deg):
-    if current_vertex in [V.B_DOWN_BEG, V.B_DOWN_END]:
+    if current_vertex in [V.B_DOWN_BEG, V.B_DOWN_END, V.A_UP_BEG, V.A_UP_END]:
         spin_left()
         spin_sleep(180)
     else:
@@ -358,21 +362,27 @@ def path_to_route(path):
 
 
 
-def seek_and_find_down(LoadingBay):
+def seek_and_find(LoadingBay):
     global current_heading
     global current_vertex
     global emergency_stop
+    global loading_state
+    global zone
     colour = 'GREEN'
     loading_stage = 0
     turn_counter_on = True
     turn_counter = 0
+    if zone = 'down':
+        max_number_of_turns = 7
+    else:
+        max_number_of_turns = 6
     for edge in map.DIRECTED_EDGES:
         if edge.src == LoadingBay and edge.dst in [V.B_DOWN_END, V.A_DOWN_END, V.B_UP_END, V.A_UP_END]:
             if edge.start_heading - current_heading == 2 or edge.start_heading - current_heading == -2:
-                spin_right()
-                spin_sleep(180)
-    
-    while turn_counter < 7 and not emergency_stop:
+                spin_back()
+    if LoadingBay == V.B_UP_BEG:
+        shift_back_without_correction((16//5.5)*((950//BASE)*40))
+    while turn_counter < max_number_of_turns and not emergency_stop:
         c = read_code()
         print("loading stage:",loading_stage, "turn_counter:", turn_counter)
         FL = (c>>3)&1;  FR = c&1
@@ -426,10 +436,8 @@ def seek_and_find_down(LoadingBay):
         elif loading_stage == 3:
             # Run the loading pipeline state machine until it either
             # completes a lift or decides to reset the cycle.
-            global loading_state
             go(0,0)
-            sleep_ms(500)
-
+            sleep_ms(100)
             while True:
                 result = pipeline_step(loading_state)
                 print("Loading pipeline step result:", result)
@@ -446,19 +454,16 @@ def seek_and_find_down(LoadingBay):
                 break
 
             shift_back_without_correction((16//5.5)*((950//BASE)*40))
-            if current_vertex in [V.A_DOWN_BEG]:
+            if current_vertex in [V.A_DOWN_BEG, V.B_UP_BEG]:
                 print('1')
                 spin_right()
                 print('2')
                 spin_sleep(90)
                 print('3')
-            if current_vertex in [V.B_DOWN_BEG]:
+            elif current_vertex in [V.B_DOWN_BEG, V.A_UP_BEG]:
                 spin_left()
                 spin_sleep(90)
-
-            turn_counter = 8 - turn_counter
-
-            
+                turn_counter = max_number_of_turns + 1 - turn_counter
             loading_stage = 4
 
 
@@ -486,6 +491,8 @@ def seek_and_find_down(LoadingBay):
         sleep_ms(DT_MS)
     if current_vertex == V.A_DOWN_BEG:
         current_vertex = V.A_DOWN_END
+    elif current_vertex == V.B_UP_BEG:
+        current_vertex = V.B_UP_END
     elif loading_stage == 4:
         current_heading = 2
     else:
@@ -498,12 +505,12 @@ def complete_route(branch_route):
     global emergency_stop
     branch_index = 0
 
-    if branch_route[branch_index] == 'R':
-        spin_right()
-        spin_sleep(90)
-    elif branch_route[branch_index] == 'L':
-        spin_left()
-        spin_sleep(90)
+    # if branch_route[branch_index] == 'R':
+    #     spin_right()
+    #     spin_sleep(90)
+    # elif branch_route[branch_index] == 'L':
+    #     spin_left()
+    #     spin_sleep(90)
     elif branch_route[branch_index] == 'B':
         spin_back()
     branch_index = 1
@@ -642,8 +649,9 @@ def complete_route(branch_route):
         
 
         sleep_ms(DT_MS)
-    go(BASE, BASE)
-    sleep_ms(800)
+    # go(BASE, BASE)
+    # sleep_ms(800)
+    shift_with_correction((16//5.5)*((950//BASE)*40))
     current_heading = finish_heading
 
 
@@ -661,7 +669,10 @@ def go_to(finish_vertex):
     print("Path:", current_path)
     print("Route:", branch_route)
 
-
+if current_vertex in [V.A_DOWN_BEG, V.B_DOWN_BEG]:
+    zone = 'down'
+else:
+    zone = 'up'
 loading_bays = [V.B_DOWN_BEG, V.B_UP_BEG, V.A_UP_BEG, V.B_DOWN_BEG]  # list of loading bay vertices
 boxes_delivered = 0
 number_of_bay = 0
@@ -722,12 +733,9 @@ def main():
             continue
 
         # Move to the last loading bay spot and check for boxes.
-        # go_to(last_checked_bay)
-        # print('1')
-        if loading_bays[number_of_bay] in [V.A_DOWN_BEG, V.B_DOWN_BEG]:
-            found_color = seek_and_find_down(loading_bays[number_of_bay])
-        else:
-            found_color = seek_and_find_up(loading_bays[number_of_bay])  # before testing without color sensor
+        go_to(last_checked_bay)
+        print('1')
+        found_color = seek_and_find(loading_bays[number_of_bay])
         found_color = 'GREEN'  # before testing without color sensor
         print("Found color:", found_color)
         if found_color is not None:  # if we found any boxes there
