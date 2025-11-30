@@ -429,11 +429,10 @@ def seek_and_find(LoadingBay):
             #    light, rgb = loading_pipeline.sample_color(loading_pipeline.color_power)
             #    colour = loading_pipeline.detect_color(light, rgb)
             #    print("Detected color:", colour)
-            #    continue
+            #    continue             #color sensor needs fixing
             delta_tick = ticks_diff(ticks_ms(), tick0)
             if sensor_distance2 != None:
                 if sensor_distance2 < PICKUP_DISTANCE and sensor_distance2 > 0:
-                    # pipeline_main()
                     loading_stage = 3
                     continue
             if delta_tick > 2000:  # timeout after 2 seconds
@@ -505,6 +504,8 @@ def seek_and_find(LoadingBay):
         current_vertex = V.B_DOWN_END
     else:
         current_vertex = V.A_UP_END
+    if current_vertex != V.A_UP_END:
+        shift_with_correction((950//BASE)*40)
     return colour
 
 def complete_route(branch_route):
@@ -519,8 +520,10 @@ def complete_route(branch_route):
     # elif branch_route[branch_index] == 'L':
     #     spin_left()
     #     spin_sleep(90)
-    elif branch_route[branch_index] == 'B':
+    if branch_route[branch_index] == 'B':
         spin_back()
+    if current_vertex == V.A_UP_END:
+        shift_back_without_correction((950//BASE)*40)
     branch_index = 1
 
     turning = None
