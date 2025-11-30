@@ -152,6 +152,8 @@ mR = Motor(7,6, INVERT_RIGHT)
 
 # ----- TUNING -----
 BASE  = 50    # straight speed
+SPIN_BASE = 50
+LOAD_BASE = 40
 SEEK_COEFF = 0.5  # how aggressively to seek line
 DELTA = 17    # small correction to reach 0110
 HARD  = 30    # strong correction when far(turns)
@@ -186,8 +188,8 @@ def read_code():
 
 
 def go(vL, vR): mL.fwd(vL); mR.fwd(vR)
-def spin_left(v): mL.bwd(v); mR.fwd(v)
-def spin_right(v): mL.fwd(v); mR.bwd(v)
+def spin_left(): mL.bwd(SPIN_BASE); mR.fwd(SPIN_BASE)
+def spin_right(): mL.fwd(SPIN_BASE); mR.bwd(SPIN_BASE)
 def go_back(vL, vR): mL.bwd(vL); mR.bwd(vR)
 
 def shift_with_correction(duration_ms):
@@ -210,12 +212,12 @@ def shift_with_correction(duration_ms):
         elif c in (0b0011, 0b0001):   # far to right
             go(BASE + HARD, BASE - HARD)
         else:
-            # unknown/lost -> gentle bias to move forward
+            # unknown/lost -> move forward
             go(BASE, BASE)
 
         sleep_ms(DT_MS)
 
-def shift_back_with_correction(duration_ms):
+def shift_back_without_correction(duration_ms):
     global emergency_stop
     t0 = ticks_ms()
     while ticks_diff(ticks_ms(), t0) < duration_ms:
@@ -267,7 +269,7 @@ def arc(side):
 
     elif side == 'F':
         add_branch_index += 1        # consume the 'F'
-        go(100,100)
+        go(BASE+10,BASE+10)
         sleep_ms(200)  # move forward length of line
         print('F')
 
@@ -278,10 +280,10 @@ def arc(side):
         print('X(F)')
     return add_branch_index
 
-def go_spin(deg, speed):
+def go_spin_left(deg):
     shift_with_correction((950//BASE)*40)  # move forward length of line
-    spin_left(speed)   # inner slower
-    spin_sleep(deg, speed)
+    spin_left()   # inner slower
+    spin_sleep(deg)
 
 
 
@@ -290,9 +292,9 @@ def turn_sleep(deg, speed):
     time_ms = (distance / (speed * 0.25)) * 1000 # time in ms
     sleep_ms(int(time_ms))
 
-def spin_sleep(deg, speed):
+def spin_sleep(deg):
     distance = (deg / 180) * 3.14 * RADIUS_OF_TURN  # distance to travel
-    time_ms = (distance*0.63 / (speed * 0.25)) * 1000 * 0.9  # time in ms
+    time_ms = (distance*0.71 / (SPIN_BASE * 0.25)) * 1000 * 0.9  # time in ms
     sleep_ms(int(time_ms))
 
 
@@ -301,11 +303,11 @@ def slight_left(c):  return c == 0b0100
 def slight_right(c): return c == 0b0010
 def spin_back(deg):
     if current_vertex in [V.B_DOWN_BEG, V.B_DOWN_END]:
-        spin_left(BASE)
-        spin_sleep(180, BASE)
+        spin_left()
+        spin_sleep(180)
     else:
-        spin_right(BASE)
-        spin_sleep(180, BASE)
+        spin_right()
+        spin_sleep(180)
 
 
 def path_to_route(path):
@@ -338,8 +340,11 @@ def path_to_route(path):
             if edge.src == prev and edge.dst == curr:
                 if next is None:
                     edge0 = edge
-                if edge.src in [V.B_DOWN_BEG, V.B_DOWN_END, V.A_DOWN_BEG, V.A_DOWN_END, V.B_UP_BEG, V.B_UP_END, V.A_UP_BEG, V.A_UP_END] and edge.dst in [V.B_DOWN_BEG, V.B_DOWN_END, V.A_DOWN_BEG, V.A_DOWN_END, V.B_UP_BEG, V.B_UP_END, V.A_UP_BEG, V.A_UP_END]:
+                if edge.src in [V.B_DOWN_BEG, V.B_DOWN_END, V.A_DOWN_BEG, V.A_DOWN_END] and edge.dst in [V.B_DOWN_BEG, V.B_DOWN_END, V.A_DOWN_BEG, V.A_DOWN_END]:
                     for i in range(7):
+                        route.append('F')
+                elif edge.src in [V.B_UP_BEG, V.B_UP_END, V.A_UP_BEG, V.A_UP_END] and edge.dst in [V.B_UP_BEG, V.B_UP_END, V.A_UP_BEG, V.A_UP_END]:
+                    for i in range(6):
                         route.append('F')
                 else:
                     route.append(edge.turn)
@@ -353,7 +358,7 @@ def path_to_route(path):
 
 
 
-def seek_and_find(LoadingBay):
+def seek_and_find_down(LoadingBay):
     global current_heading
     global current_vertex
     global emergency_stop
@@ -364,8 +369,8 @@ def seek_and_find(LoadingBay):
     for edge in map.DIRECTED_EDGES:
         if edge.src == LoadingBay and edge.dst in [V.B_DOWN_END, V.A_DOWN_END, V.B_UP_END, V.A_UP_END]:
             if edge.start_heading - current_heading == 2 or edge.start_heading - current_heading == -2:
-                spin_right(BASE)
-                spin_sleep(180, BASE)
+                spin_right()
+                spin_sleep(180)
     
     while turn_counter < 7 and not emergency_stop:
         c = read_code()
@@ -397,7 +402,7 @@ def seek_and_find(LoadingBay):
         #     continue
 
         if c == 0b1110 and loading_stage == 1:
-            go_spin(90, BASE)                 # branch_index += arc() will consume this route entry
+            go_spin_left(90)                 # branch_index += arc() will consume this route entry
             sleep_ms(DT_MS)
             loading_stage = 2
             tick0 = ticks_ms()
@@ -440,16 +445,16 @@ def seek_and_find(LoadingBay):
                 # Any unexpected result: break to avoid hanging
                 break
 
-            shift_back_with_correction((16//5.5)*((950//BASE)*40))
+            shift_back_without_correction((16//5.5)*((950//BASE)*40))
             if current_vertex in [V.A_DOWN_BEG]:
                 print('1')
-                spin_right(BASE)
+                spin_right()
                 print('2')
-                spin_sleep(95, BASE)
+                spin_sleep(90)
                 print('3')
             if current_vertex in [V.B_DOWN_BEG]:
-                spin_left(BASE)
-                spin_sleep(95, BASE)
+                spin_left()
+                spin_sleep(90)
 
             turn_counter = 8 - turn_counter
 
@@ -481,8 +486,10 @@ def seek_and_find(LoadingBay):
         sleep_ms(DT_MS)
     if current_vertex == V.A_DOWN_BEG:
         current_vertex = V.A_DOWN_END
-    elif current_vertex == V.B_DOWN_BEG:
+    elif loading_stage == 4:
         current_heading = 2
+    else:
+        current_vertex = V.B_DOWN_END
     return colour
 
 def complete_route(branch_route):
@@ -492,13 +499,13 @@ def complete_route(branch_route):
     branch_index = 0
 
     if branch_route[branch_index] == 'R':
-        spin_right(BASE)
-        spin_sleep(90, BASE)
+        spin_right()
+        spin_sleep(90)
     elif branch_route[branch_index] == 'L':
-        spin_left(BASE)
-        spin_sleep(90, BASE)
+        spin_left()
+        spin_sleep(90)
     elif branch_route[branch_index] == 'B':
-        spin_back(BASE)
+        spin_back()
     branch_index = 1
 
     turning = None
@@ -717,23 +724,25 @@ def main():
         # Move to the last loading bay spot and check for boxes.
         # go_to(last_checked_bay)
         # print('1')
-
-        # found_color = seek_and_find(last_checked_bay)
-        found_color = 0
-        # print("Found color:", found_color)
+        if loading_bays[number_of_bay] in [V.A_DOWN_BEG, V.B_DOWN_BEG]:
+            found_color = seek_and_find_down(loading_bays[number_of_bay])
+        else:
+            found_color = seek_and_find_up(loading_bays[number_of_bay])  # before testing without color sensor
+        found_color = 'GREEN'  # before testing without color sensor
+        print("Found color:", found_color)
         if found_color is not None:  # if we found any boxes there
-            # print('2')
-            # color = found_color  # get the color of the box
-            # print('3')
-            # delivery_area = color_to_vertex(color)  # map color to vertex
-            # print('4')
-            # print("Delivering to:", delivery_area)
-            # go_to(delivery_area)  # go to delivery area
-            # boxes_delivered += 1 # increment boxes delivered
-            # shift_with_correction((16//5.5)*((950//BASE)*40))
+            print('2')
+            color = found_color  # get the color of the box
+            print('3')
+            delivery_area = color_to_vertex(color)  # map color to vertex
+            print('4')
+            print("Delivering to:", delivery_area)
+            go_to(delivery_area)  # go to delivery area
+            boxes_delivered += 1 # increment boxes delivered
+            shift_with_correction((16//5.5)*((950//BASE)*40))
             go(0,0)
             unload_robot() # unload any boxes we have
-            shift_back_with_correction((8//5.5)*((950//BASE)*40))
+            shift_back_without_correction((8//5.5)*((950//BASE)*40))
         else:
             number_of_bay = (number_of_bay + 1) % len(loading_bays) # set target to next bay
 
@@ -743,7 +752,16 @@ def main():
 
 
     go_to(V.START)
+    shift_to_the_box()
     go(0,0)
+
+def shift_to_the_box()
+    pass
+
+
+
+
+
 
 # if __name__ == "__main__":
 #     unload_robot()
