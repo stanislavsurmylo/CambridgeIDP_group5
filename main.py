@@ -368,6 +368,7 @@ def seek_and_find(LoadingBay):
     global emergency_stop
     global loading_state
     global zone
+    global number_of_bay
     colour = 'GREEN'
     loading_stage = 0
     turn_counter_on = True
@@ -381,7 +382,7 @@ def seek_and_find(LoadingBay):
             if edge.start_heading - current_heading == 2 or edge.start_heading - current_heading == -2:
                 spin_back()
     if LoadingBay == V.B_UP_BEG:
-        shift_back_without_correction((16//5.5)*((950//BASE)*40))
+        shift_back_without_correction((950//BASE)*40)
     while turn_counter < max_number_of_turns and not emergency_stop:
         c = read_code()
         print("loading stage:",loading_stage, "turn_counter:", turn_counter)
@@ -396,12 +397,13 @@ def seek_and_find(LoadingBay):
             turn_counter_on = False
             # sensor_distance1 = vl53l0x_read_distance(setup_sensor1)
             # print("Distance:", sensor_distance1)
-            # if sensor_distance1 < TARGET_DISTANCE:
+            # if sensor_distance1 < TARGET_DISTANCE:  # long-range distance sensor needs fixing
             if True:
                 # tick1 = ticks_ms()
-                # if tick1 - tick0 > 50:
+                # if tick1 - tick0 > 50: #???(debounce?)
                 loading_stage = 1
                 continue
+            
                 
         elif loading_stage == 0:  
             turn_counter_on = True
@@ -412,6 +414,8 @@ def seek_and_find(LoadingBay):
         #     continue
 
         if c == 0b1110 and loading_stage == 1:
+            if turn_counter = max_number_of_turns:
+                number_of_bay = (number_of_bay + 1) % len(loading_bays)
             go_spin_left(90)                 # branch_index += arc() will consume this route entry
             sleep_ms(DT_MS)
             loading_stage = 2
@@ -495,8 +499,10 @@ def seek_and_find(LoadingBay):
         current_vertex = V.B_UP_END
     elif loading_stage == 4:
         current_heading = 2
-    else:
+    elif current_vertex == V.B_DOWN_BEG:
         current_vertex = V.B_DOWN_END
+    else:
+        current_vertex = V.A_UP_END
     return colour
 
 def complete_route(branch_route):
@@ -651,7 +657,7 @@ def complete_route(branch_route):
         sleep_ms(DT_MS)
     # go(BASE, BASE)
     # sleep_ms(800)
-    shift_with_correction((16//5.5)*((950//BASE)*40))
+    shift_with_correction((950//BASE)*40)
     current_heading = finish_heading
 
 
@@ -669,7 +675,7 @@ def go_to(finish_vertex):
     print("Path:", current_path)
     print("Route:", branch_route)
 
-if current_vertex in [V.A_DOWN_BEG, V.B_DOWN_BEG]:
+if current_vertex in [V.A_DOWN_BEG, V.B_DOWN_BEG, V.A_DOWN_END, V.B_DOWN_END]:
     zone = 'down'
 else:
     zone = 'up'
@@ -711,7 +717,7 @@ def main():
     sm_yellow.active(1)
 
     actuator = Actuator(ACTUATOR_DIR_PIN, ACTUATOR_PWM_PIN)
-    # loading_pipeline.initialize_actuator(actuator)
+    # loading_pipeline.initialize_actuator_down(actuator)
     actuator_initialized_cycle = True
 
     while boxes_delivered < 4:
@@ -726,7 +732,10 @@ def main():
         # then proceed to movement on the next iteration.
         if not init_distance_unlock:
             actuator = Actuator(ACTUATOR_DIR_PIN, ACTUATOR_PWM_PIN)
-            loading_pipeline_state_machine.initialize_actuator(actuator)
+            if number_of_bay in [0, 1]:
+                loading_pipeline_state_machine.initialize_actuator_down(actuator)
+            else:
+                loading_pipeline_state_machine.initialize_actuator_up(actuator)
             init_distance_unlock = True
             # Go back to the top of the loop; next iteration will do movement.
             print('0')
@@ -739,18 +748,14 @@ def main():
         found_color = 'GREEN'  # before testing without color sensor
         print("Found color:", found_color)
         if found_color is not None:  # if we found any boxes there
-            print('2')
-            color = found_color  # get the color of the box
-            print('3')
-            delivery_area = color_to_vertex(color)  # map color to vertex
-            print('4')
+            delivery_area = color_to_vertex(found_color)  # map color to vertex
             print("Delivering to:", delivery_area)
             go_to(delivery_area)  # go to delivery area
             boxes_delivered += 1 # increment boxes delivered
             shift_with_correction((16//5.5)*((950//BASE)*40))
             go(0,0)
             unload_robot() # unload any boxes we have
-            shift_back_without_correction((8//5.5)*((950//BASE)*40))
+            shift_back_without_correction((950//BASE)*40)
         else:
             number_of_bay = (number_of_bay + 1) % len(loading_bays) # set target to next bay
 
