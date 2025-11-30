@@ -172,10 +172,10 @@ DIRECTED_EDGES = [
     DirectedEdge(src=V.UP_RIGHT   , dst=V.RAMP       , start_heading=3, turn='R', end_heading=0, cost=5.0),
     DirectedEdge(src=V.UP_RIGHT   , dst=V.UP_LEFT    , start_heading=3, turn='F', end_heading=3, cost=2.0),
 
-    DirectedEdge(src=V.B_UP_BEG   , dst=V.UP_RIGHT   , start_heading=2, turn='R', end_heading=3, cost=3.0),
-    DirectedEdge(src=V.B_UP_BEG   , dst=V.B_UP_END   , start_heading=0, turn='F', end_heading=0, cost=6.0),
+    DirectedEdge(src=V.B_UP_END   , dst=V.UP_RIGHT   , start_heading=2, turn='R', end_heading=3, cost=3.0),
+    DirectedEdge(src=V.B_UP_END   , dst=V.B_UP_BEG   , start_heading=0, turn='F', end_heading=0, cost=6.0),
 
-    DirectedEdge(src=V.B_UP_END   , dst=V.B_UP_BEG   , start_heading=2, turn='F', end_heading=2, cost=6.0),
+    DirectedEdge(src=V.B_UP_BEG   , dst=V.B_UP_END   , start_heading=2, turn='F', end_heading=2, cost=6.0),
 
 ]
 
