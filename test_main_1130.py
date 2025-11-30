@@ -129,9 +129,6 @@ button.irq(trigger=Pin.IRQ_FALLING, handler=_button_irq)
 #vl53l0x distance sensor:
 # setup_sensor1 = setup_sensor_vl53l0x()
 
-
-loading_state = LoadingPipelineState()
-
 # colour sensor:
 color_power = Pin(COLOR_POWER_PIN, Pin.OUT, value=0)
 
@@ -146,12 +143,21 @@ def setup_sensor_tmf8701():
     return sensor
 
 def read_distance_mm(sensor):
-    if sensor.is_data_ready():
-        dist_mm = sensor.get_distance_mm()
-        return dist_mm
+    try:
+        if sensor.is_data_ready():
+            dist_mm = sensor.get_distance_mm()
+            return dist_mm
+    except Exception as e:
+        # Handle I2C timeout or other communication errors
+        print(f"I2C error in read_distance_mm: {e}")
+        return None
     return None
 
+# Initialize all sensors independently
 setup_sensor2 = setup_sensor_tmf8701()
+
+# Create loading_state with the sensor we just initialized
+loading_state = LoadingPipelineState(tmf8701=setup_sensor2)
 
 
 # ----- SENSORS (left->right). Swap sFL,sFR wires here if needed -----
@@ -451,7 +457,7 @@ def seek_and_find(LoadingBay):
             # Run the loading pipeline state machine until it either
             # completes a lift or decides to reset the cycle.
             go(0,0)
-            sleep_ms(100)
+            sleep_ms(200)  # Give sensor time to stabilize after stage 2
             while True:
                 result = pipeline_step(loading_state)
                 print("Loading pipeline step result:", result)

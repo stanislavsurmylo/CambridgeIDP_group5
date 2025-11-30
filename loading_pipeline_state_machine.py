@@ -133,21 +133,27 @@ def sample_color(power_ctrl):
     return light, rgb
 
 def read_distance_cm(sensor):
-    if sensor.is_data_ready():
-        dist_mm = sensor.get_distance_mm()
-        return dist_mm / 10.0
+    try:
+        if sensor.is_data_ready():
+            dist_mm = sensor.get_distance_mm()
+            return dist_mm / 10.0
+    except Exception as e:
+        # Handle I2C timeout or other communication errors
+        print(f"I2C error in read_distance_cm: {e}")
+        return None
     return None
 
 
 class LoadingPipelineState:
     """Holds hardware references and per-cycle flags for the loading pipeline."""
 
-    def __init__(self, loading_zone=LOADING_ZONE, loop_delay=LOOP_DELAY):
+    def __init__(self, loading_zone=LOADING_ZONE, loop_delay=LOOP_DELAY, tmf8701=None, actuator=None):
         self.loading_zone = loading_zone
         self.loop_delay = loop_delay
         self.color_power = Pin(COLOR_POWER_PIN, Pin.OUT, value=0)
-        self.tmf8701 = setup_sensor_tmf8701()
-        self.actuator = Actuator(ACTUATOR_DIR_PIN, ACTUATOR_PWM_PIN)
+        # Use provided sensor/actuator or create new ones
+        self.tmf8701 = tmf8701 if tmf8701 is not None else setup_sensor_tmf8701()
+        self.actuator = actuator if actuator is not None else Actuator(ACTUATOR_DIR_PIN, ACTUATOR_PWM_PIN)
         self.reset_cycle_flags()
 
     def reset_cycle_flags(self):
