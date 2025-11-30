@@ -430,12 +430,17 @@ def seek_and_find(LoadingBay):
             #    colour = loading_pipeline.detect_color(light, rgb)
             #    print("Detected color:", colour)
             #    continue
+            delta_tick = ticks_diff(ticks_ms(), tick0)
             if sensor_distance2 != None:
                 if sensor_distance2 < PICKUP_DISTANCE and sensor_distance2 > 0:
                     # pipeline_main()
                     loading_stage = 3
-                    delta_tick = ticks_diff(ticks_ms(), tick0)
                     continue
+            if delta_tick > 2000:  # timeout after 2 seconds
+                shift_back_without_correction((16//5.5)*((950//BASE)*40))
+                spin_right()
+                spin_sleep(90)
+                loading_stage = 0
             
         elif loading_stage == 3:
             # Run the loading pipeline state machine until it either
@@ -459,11 +464,8 @@ def seek_and_find(LoadingBay):
 
             shift_back_without_correction((16//5.5)*((950//BASE)*40))
             if current_vertex in [V.A_DOWN_BEG, V.B_UP_BEG]:
-                print('1')
                 spin_right()
-                print('2')
                 spin_sleep(90)
-                print('3')
             elif current_vertex in [V.B_DOWN_BEG, V.A_UP_BEG]:
                 spin_left()
                 spin_sleep(90)
