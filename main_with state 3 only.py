@@ -110,10 +110,9 @@ def blink_1hz():
 # Global flags for button control
 robot_started = False  # True after first button press (start)
 emergency_stop = False  # True when paused (after robot has started)
-global_actuator = None  # Global actuator reference for emergency stop
 
 def _button_irq(pin):
-    global robot_started, emergency_stop, global_actuator
+    global robot_started, emergency_stop
     if not robot_started:
         robot_started = True
         emergency_stop = False
@@ -122,12 +121,6 @@ def _button_irq(pin):
         if emergency_stop:
             mL.stop()
             mR.stop()
-            # Stop actuator if it exists
-            if global_actuator is not None:
-                try:
-                    global_actuator.stop()
-                except:
-                    pass
 
 # Trigger on falling edge (button pressed to GND when using pull-up)
 button = Pin(BUTTON_PIN, Pin.IN, Pin.PULL_UP)
@@ -486,16 +479,6 @@ def seek_and_find(LoadingBay):
             
             result = None
             while True:
-                # Check emergency stop before each step
-                if emergency_stop:
-                    print("Emergency stop detected in loading_stage 3, breaking out")
-                    if global_actuator is not None:
-                        try:
-                            global_actuator.stop()
-                        except:
-                            pass
-                    break
-                
                 result = pipeline_step(loading_state)
                 print("Loading pipeline step result:", result)
 
@@ -769,7 +752,6 @@ def main():
     global init_distance_unlock
     global setup_sensor2
     global loading_state
-    global global_actuator
 
     # This flag controls whether we've already run the actuator init
     # cycle for the current round. It is reset at the end of each loop
@@ -788,7 +770,6 @@ def main():
     print("Sensor initialization complete.")
 
     actuator = Actuator(ACTUATOR_DIR_PIN, ACTUATOR_PWM_PIN)
-    global_actuator = actuator  # Store global reference for emergency stop
     # loading_pipeline.initialize_actuator_down(actuator)
     actuator_initialized_cycle = True
 
@@ -807,12 +788,6 @@ def main():
         if emergency_stop:
             go(0, 0)
             sm_yellow.active(0)  # Stop LED when paused
-            # Stop actuator if it exists
-            if global_actuator is not None:
-                try:
-                    global_actuator.stop()
-                except:
-                    pass
             sleep_ms(100)  # Small delay to avoid busy waiting
             continue
         
@@ -822,20 +797,7 @@ def main():
         # Run the actuator initialization cycle once at the start of each round,
         # then proceed to movement on the next iteration.
         if not init_distance_unlock:
-            # Check emergency stop before initializing actuator
-            if emergency_stop:
-                go(0, 0)
-                sm_yellow.active(0)
-                if global_actuator is not None:
-                    try:
-                        global_actuator.stop()
-                    except:
-                        pass
-                sleep_ms(100)
-                continue
-            
             actuator = Actuator(ACTUATOR_DIR_PIN, ACTUATOR_PWM_PIN)
-            global_actuator = actuator  # Update global reference
             if number_of_bay in [0, 1]:
                 loading_pipeline_state_machine.initialize_actuator_down(actuator)
             else:
@@ -846,10 +808,78 @@ def main():
             print('0')
             continue
 
-        # Move to the last loading bay spot and check for boxes.
-        go_to(last_checked_bay)
-        print('1')
-        found_color = seek_and_find(loading_bays[number_of_bay])
+        # TEMPORARY: Skip navigation, start directly from loading_stage 2
+        # go_to(last_checked_bay)
+        # print('1')
+        # found_color = seek_and_find(loading_bays[number_of_bay])
+        
+        # Start directly from loading_stage 2 for testing
+        print("Skipping navigation, starting directly from loading_stage 2...")
+        loading_stage = 2
+        tick0 = ticks_ms()
+        found_color = None
+        
+        # Simulate the loading_stage 2 and 3 logic from seek_and_find
+        while loading_stage in [2, 3]:
+            if emergency_stop:
+                go(0, 0)
+                sm_yellow.active(0)
+                sleep_ms(100)
+                continue
+            
+            sm_yellow.active(1)
+            
+            if loading_stage == 2:
+                sensor_distance2 = read_distance_mm(setup_sensor2)
+                print(f"Stage 2 - Distance: {sensor_distance2} mm")
+                delta_tick = ticks_diff(ticks_ms(), tick0)
+                
+                if sensor_distance2 != None:
+                    if sensor_distance2 < PICKUP_DISTANCE and sensor_distance2 > 0:
+                        print("Object detected within pickup distance, moving to loading_stage 3")
+                        loading_stage = 3
+                        continue
+                
+                if delta_tick > 2000:
+                    print("Timeout: No object detected within 2 seconds, resetting to stage 2")
+                    tick0 = ticks_ms()
+                    continue
+            
+            elif loading_stage == 3:
+                # Run the loading pipeline state machine
+                loading_state.reset_cycle_flags()
+                go(0, 0)
+                sleep_ms(200)
+                
+                result = None
+                while True:
+                    result = pipeline_step(loading_state)
+                    print("Loading pipeline step result:", result)
+                    
+                    if result in ("waiting_sensor", "monitoring", "init_unlocked", "actuator_initialized", "color_sampled"):
+                        continue
+                    
+                    if result in ("lift_triggered", "state_reset"):
+                        break
+                    
+                    print(f"Unexpected result: {result}, breaking out of state machine loop")
+                    break
+                
+                found_color = loading_state.detected_color
+                print("State machine detected color:", found_color)
+                
+                if result == "lift_triggered":
+                    print("Lift completed successfully!")
+                    break
+                else:
+                    print("State machine reset or failed, resetting to stage 2")
+                    loading_stage = 2
+                    tick0 = ticks_ms()
+                    loading_state.reset_cycle_flags()
+                    continue
+            
+            sleep_ms(100)
+        
         # found_color now contains the color detected by state machine in loading_stage == 3
         print("Found color:", found_color)
         if found_color is not None:  # if we found any boxes there

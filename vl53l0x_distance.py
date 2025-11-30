@@ -1,81 +1,100 @@
 from machine import I2C, Pin
-from utime import sleep
+from utime import sleep_ms
+from libs.vl53l0x import VL53L0X, TimeoutError
 
 I2C_ID = 0
 PIN_SCL = 9          
 PIN_SDA = 8          
-SAMPLE_INTERVAL_SECONDS = 0.5
-
-try:
-    import VL53L0X  # this imports the file VL53L0X.py as a module
-except ImportError as e:
-    raise RuntimeError(
-        "VL53L0X driver not found. Make sure 'VL53L0X.py' is on the Pico."
-    ) from e
-# --- import the driver once, and show a clear error if something is wrong ---
-# try:
-#     import VL53L0X as vl
-# except ImportError as e:
-#     # This means the file VL53L0X.py is not found on the Pico or cannot be imported
-#     raise RuntimeError(
-#         "Cannot import VL53L0X module. "
-#         "Check that 'VL53L0X.py' is copied to the Pico (/, or /lib) "
-#         "and the name/case matches exactly."
-#     ) from e
-
-# # figure out how the class is named inside the driver
-# VLClass = getattr(vl, "VL53L0Xclass", None) or getattr(vl, "VL53L0X", None)
-# if VLClass is None:
-#     # Module is there, but the expected class is missing
-#     raise RuntimeError(
-#         "VL53L0X driver mod   ule imported, but neither 'VL53L0Xclass' nor "
-#         "'VL53L0X' is defined inside it."
-#     )
 
 def setup_sensor_vl53l0x():
-    i2c_bus = I2C(id=I2C_ID, sda=Pin(PIN_SDA), scl=Pin(PIN_SCL))
+    """Initialize VL53L0X distance sensor (single attempt)."""
+    try:
+        sleep_ms(200)
+        i2c_bus = I2C(id=I2C_ID, sda=Pin(PIN_SDA), scl=Pin(PIN_SCL), freq=100000)
+        sleep_ms(50)
+        
+        devices = i2c_bus.scan()
+        if 0x29 not in devices:
+            print("ERROR: Sensor not found at 0x29")
+            return None
+        
+        sleep_ms(100)
+        sensor = VL53L0X(i2c_bus)
+        sensor.set_Vcsel_pulse_period(sensor.vcsel_period_type[0], 18)
+        sensor.set_Vcsel_pulse_period(sensor.vcsel_period_type[1], 14)
+        sensor.start()
+        return sensor
+    except Exception as e:
+        print(f"Setup error: {e}")
+        return None
 
-    # class lives inside the module as VL53L0X.VL53L0Xclass
-    sensor = VL53L0X.VL53L0Xclass(i2c_bus)
 
-    # Higher numbers = longer pulse → more light → potentially more range
-    sensor.set_Vcsel_pulse_period(sensor.vcsel_period_type[0], 18)
-    sensor.set_Vcsel_pulse_period(sensor.vcsel_period_type[1], 14)
+def reinit_sensor_vl53l0x(sensor=None):
+    """Re-initialize VL53L0X sensor. Stops existing sensor if provided, then creates a new one."""
+    try:
+        # Stop existing sensor if provided
+        if sensor is not None:
+            try:
+                sensor.stop()
+                print("Stopped existing sensor")
+            except:
+                pass
+        
+        # Wait a bit before reinitializing
+        sleep_ms(200)
+        
+        # Create new I2C bus
+        i2c_bus = I2C(id=I2C_ID, sda=Pin(PIN_SDA), scl=Pin(PIN_SCL), freq=100000)
+        sleep_ms(50)
+        
+        # Check if sensor is present
+        devices = i2c_bus.scan()
+        print(f"Found I2C devices: {[hex(d) for d in devices]}")
+        if 0x29 not in devices:
+            print("ERROR: Sensor not found at 0x29")
+            return None
+        
+        sleep_ms(100)
+        print("Re-initializing sensor...")
+        sensor = VL53L0X(i2c_bus)
+        sensor.set_Vcsel_pulse_period(sensor.vcsel_period_type[0], 18)
+        sensor.set_Vcsel_pulse_period(sensor.vcsel_period_type[1], 14)
+        sensor.start()  # Start the sensor immediately
+        print("Sensor re-initialized and started")
+        return sensor
+    except Exception as e:
+        print(f"Re-initialization error: {e}")
+        return None
 
-    return sensor
 
+def vl53l0x_read_distance(sensor):
+    """Read distance from VL53L0X sensor. Returns distance in mm, or None if error."""
+    try:
+        dist_mm = sensor.read()
+        # Allow readings from 0 to 2000mm (remove lower limit check)
+        if dist_mm >= 8190 or dist_mm > 2000:
+            return None
+        return dist_mm
+    except (TimeoutError, Exception) as e:
+        return None
 
-def vl53l0x_read_distance(sensor) -> int:
-    return sensor.read()
 
 def main():
     sensor = setup_sensor_vl53l0x()
+    if sensor is None:
+        return
     
-    while True:
-        try:
-            sensor.start()
-            
-            dist_mm = vl5310x_read_distance(sensor)
-            
-            if dist_mm is None:
-                print("Distance: N/A")
-            else:
-                dist_cm = dist_mm / 10.0
-                print(f"Distance: {dist_mm}mm ({dist_cm:.1f}cm)")
-            
-            sensor.stop()
-            sleep(SAMPLE_INTERVAL_SECONDS)
-            
-        except KeyboardInterrupt:
-            print("\nStopping VL53L0X reader.")
-            sensor.stop()  
-            break
-        except Exception as e:
-            print(f"Sensor error: {e}")
-            sensor.stop()  
-            sleep(1.0)
+    try:
+        while True:
+            dist_mm = vl53l0x_read_distance(sensor)
+            if dist_mm is not None:
+                print(dist_mm)
+            sleep_ms(100)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        sensor.stop()
 
 
 if __name__ == "__main__":
     main()
-

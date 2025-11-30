@@ -20,7 +20,7 @@ def main():
     if sensor.begin() != 0:
         raise RuntimeError("TMF8701 initialization failed")
 
-    if not sensor.start_measurement(sensor.eMODE_CALIB, sensor.eDISTANCE):
+    if not sensor.start_measurement(sensor.eMODE_NO_CALIB, sensor.eCOMBINE):
         raise RuntimeError("TMF8701 failed to start measurement")
 
     print("TMF8701 distance reader ready.")

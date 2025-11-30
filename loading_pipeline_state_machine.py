@@ -1,5 +1,5 @@
 from machine import I2C, Pin
-from utime import sleep
+from utime import sleep, ticks_ms, ticks_diff
 
 from libs.tcs3472 import tcs3472
 from linear_actuator import Actuator
@@ -39,6 +39,9 @@ ZONE_PRESET_DISTANCE_CM = 10.0 # Trigger zone preset extend
 COLOR_REFERENCE_DISTANCE_CM = 5  # Trigger color sampling
 LIFT_REFERENCE_DISTANCE_CM = 3 # Trigger lift phase
 LOOP_DELAY = 0.2
+# Skip initial readings to avoid invalid data (0 values)
+INITIAL_SKIP_COUNT = 3  # Skip first N readings
+INITIAL_DELAY_MS = 2000  # Wait N milliseconds before starting measurement
 
 def get_zone_extend_time(zone=LOADING_ZONE):
     if zone == 1:
@@ -122,7 +125,6 @@ def detect_color(rgb, light):
     
 def sample_color(power_ctrl, tcs3472_sensor=None):
     try:
-        power_ctrl.value(1)
         sleep(COLOR_POWER_STABILIZE_MS / 1000)
 
         # Use provided sensor or create new one
@@ -147,11 +149,11 @@ def read_distance_cm(sensor):
         if sensor.is_data_ready():
             dist_mm = sensor.get_distance_mm()
             return dist_mm / 10.0
+        return None
     except Exception as e:
         # Handle I2C timeout or other communication errors
         print(f"I2C error in read_distance_cm: {e}")
         return None
-    return None
 
 
 class LoadingPipelineState:
@@ -161,6 +163,8 @@ class LoadingPipelineState:
         self.loading_zone = loading_zone
         self.loop_delay = loop_delay
         self.color_power = Pin(COLOR_POWER_PIN, Pin.OUT, value=0)
+        # Explicitly turn off color sensor power on initialization
+        self.color_power.value(0)
         # Use provided sensor/actuator or create new ones
         self.tmf8701 = tmf8701 if tmf8701 is not None else setup_sensor_tmf8701()
         self.actuator = actuator if actuator is not None else Actuator(ACTUATOR_DIR_PIN, ACTUATOR_PWM_PIN)
@@ -177,7 +181,11 @@ class LoadingPipelineState:
         self.color_sampled = False
         self.lift_triggered = False
         self.detected_color = None
-        self.init_distance_unlock = True
+        # Ensure color sensor is turned off when resetting
+        self.color_power.value(0)
+        # Initialize timing and counter for skipping initial invalid readings
+        self.init_start_time = ticks_ms()
+        self.read_count = 0
 
 
 def _maybe_delay(state):
@@ -201,20 +209,33 @@ def pipeline_step(state):
             _maybe_delay(state)
             return "waiting_sensor"
 
+        # Skip initial readings to avoid invalid data (0 values at startup)
+        state.read_count += 1
+        elapsed_ms = ticks_diff(ticks_ms(), state.init_start_time)
+        
+        # Skip if we haven't read enough samples yet OR if not enough time has passed
+        if state.read_count <= INITIAL_SKIP_COUNT or elapsed_ms < INITIAL_DELAY_MS:
+            print(f"Distance: -- skipping initial reading (count: {state.read_count}/{INITIAL_SKIP_COUNT}, time: {elapsed_ms}ms/{INITIAL_DELAY_MS}ms)")
+            _maybe_delay(state)
+            return "waiting_sensor"
+
         # Debug: show the raw distance the state machine is seeing
         print("State machine distance (cm):", dist_cm)
 
         if (
             dist_cm <= COLOR_REFERENCE_DISTANCE_CM
-            and state.init_distance_unlock
+            and state.actuator_initialized_cycle
             and not state.color_sampled
         ):
             try:
+                state.color_power.value(1)
                 light, rgb = sample_color(state.color_power, state.tcs3472)
+                global color
                 color = detect_color(rgb, light)
                 print("Light:", light, "RGB:", rgb, "Detected color:", color)
                 state.color_sampled = True
                 state.detected_color = color
+                state.color_power.value(0)
                 _maybe_delay(state)
                 return "color_sampled"
             except Exception as e:
@@ -222,9 +243,13 @@ def pipeline_step(state):
                 _maybe_delay(state)
                 return "monitoring"  # Continue monitoring even if color sampling fails
 
+        # If lift is already triggered, cycle is complete - return immediately
+        if state.lift_triggered:
+            _maybe_delay(state)
+            return "lift_triggered"
+
         if (
             dist_cm <= LIFT_REFERENCE_DISTANCE_CM
-            and state.init_distance_unlock
             and state.color_sampled
             and not state.lift_triggered
         ):
@@ -235,6 +260,7 @@ def pipeline_step(state):
                 )
                 perform_lift(state.actuator)
                 state.lift_triggered = True
+                # Ensure color sensor is turned off after loading
                 _maybe_delay(state)
                 return "lift_triggered"
             except Exception as e:
@@ -243,9 +269,11 @@ def pipeline_step(state):
                 return "monitoring"  # Continue monitoring even if lift fails
 
         if dist_cm > ZONE_PRESET_DISTANCE_CM and (
-            state.init_distance_unlock or state.color_sampled or state.lift_triggered
+            state.color_sampled or state.lift_triggered
         ):
             print("Object moved out of range. Resetting cycle state.")
+            # Ensure color sensor is turned off when resetting
+            state.color_power.value(0)
             state.reset_cycle_flags()
             _maybe_delay(state)
             return "state_reset"
