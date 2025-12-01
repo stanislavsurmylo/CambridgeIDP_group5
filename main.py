@@ -307,7 +307,7 @@ def arc(side):
     elif side == 'F':
         add_branch_index += 1        # consume the 'F'
         go(BASE+10,BASE+10)
-        sleep_ms(200)  # move forward length of line
+        sleep_ms(300)  # move forward length of line
         print('F')
 
     else:
@@ -318,7 +318,7 @@ def arc(side):
     return add_branch_index
 
 def go_spin_left(deg):
-    shift_with_correction((950//BASE)*40)  # move forward length of line
+    shift_with_correction((940//BASE)*40)  # move forward length of line
     spin_left()   # inner slower
     spin_sleep(deg)
 
@@ -521,13 +521,8 @@ def seek_and_find(LoadingBay):
             print("State machine detected color:", colour)
 
             shift_back_without_correction((16//5.5)*((950//BASE)*40))
-            if current_vertex in [V.A_DOWN_BEG, V.B_UP_BEG]:
-                spin_right()
-                spin_sleep(90)
-            elif current_vertex in [V.B_DOWN_BEG, V.A_UP_BEG]:
-                spin_left()
-                spin_sleep(90)
-                turn_counter = max_number_of_turns + 1 - turn_counter
+            spin_right()
+            spin_sleep(90)
             loading_stage = 4
 
 
@@ -557,14 +552,12 @@ def seek_and_find(LoadingBay):
         current_vertex = V.A_DOWN_END
     elif current_vertex == V.B_UP_BEG:
         current_vertex = V.B_UP_END
-    elif loading_stage == 4:
-        current_heading = 2
     elif current_vertex == V.B_DOWN_BEG:
         current_vertex = V.B_DOWN_END
     else:
         current_vertex = V.A_UP_END
     if current_vertex != V.A_UP_END:
-        shift_with_correction((950//BASE)*40)
+        shift_back_without_correction((940//BASE)*40)
     return colour
 
 def complete_route(branch_route):
@@ -721,7 +714,7 @@ def complete_route(branch_route):
         sleep_ms(DT_MS)
     # go(BASE, BASE)
     # sleep_ms(800)
-    shift_with_correction((950//BASE)*40)
+    shift_back_without_correction((940//BASE)*40)
     current_heading = finish_heading
 
 
