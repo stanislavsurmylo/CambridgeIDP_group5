@@ -58,14 +58,14 @@ def initialize_actuator_down(actuator, zone):
     print("Reached bottommost position")
     # Set default position based on zone
     zone_extend_time = get_zone_extend_time(zone)
-    print("Setting default position for zone {} (extending for {} seconds)...".format(zone, zone_extend_time))
+    print("Setting default position for zone {} (extending for {} seconds)...".format(zone, 7.3))
     actuator.extend(speed=ACTUATOR_SPEED)
-    sleep(zone_extend_time)
+    sleep(7.3)
     actuator.stop()
     sleep(0.1)
     print("Actuator initialization complete. Ready for loading.\n")
 
-def initialize_actuator_up(actuator, zone):
+def initialize_actuator_up(actuator, zone=LOADING_ZONE):
     actuator.retract(speed=100)  # Maximum speed
     sleep(INIT_RETRACT_TIME)
     actuator.stop()

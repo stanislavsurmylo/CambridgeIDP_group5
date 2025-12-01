@@ -133,7 +133,7 @@ button = Pin(BUTTON_PIN, Pin.IN, Pin.PULL_UP)
 button.irq(trigger=Pin.IRQ_FALLING, handler=_button_irq)
 
 #vl53l0x distance sensor:
-# setup_sensor1 = setup_sensor_vl53l0x()
+setup_sensor1 = setup_sensor_vl53l0x()
 
 # colour sensor:
 color_power = Pin(COLOR_POWER_PIN, Pin.OUT, value=0)
@@ -207,8 +207,8 @@ def W(x): return x == WHITE_LEVEL
 
 # branch_route = []  path = list of vertices; route = list of 'L','R','F','B'
 # branch_index = 0
-current_heading = 0
-current_vertex = V.START
+current_heading = 1
+current_vertex = V.RIGHT
 finish_vertex = None
 finish_heading = None
 
@@ -353,7 +353,7 @@ def spin_sleep(deg):
 def centered(c):   return c == 0b0110
 def slight_left(c):  return c == 0b0100
 def slight_right(c): return c == 0b0010
-def spin_back(deg):
+def spin_back():
     if current_vertex in [V.B_DOWN_BEG, V.B_DOWN_END, V.A_UP_BEG, V.A_UP_END]:
         spin_left()
         spin_sleep(180)
@@ -411,6 +411,7 @@ def path_to_route(path):
 
 
 def seek_and_find(LoadingBay):
+    print("Seeking and finding at loading bay:", LoadingBay)
     global current_heading
     global current_vertex
     global emergency_stop
@@ -422,10 +423,11 @@ def seek_and_find(LoadingBay):
     turn_counter = 0
     colour = None  # Initialize colour variable
     number_of_bay = (number_of_bay + 1) % len(loading_bays)
-    if zone == 'down':
+    if LoadingBay in [V.B_DOWN_BEG, V.A_DOWN_BEG]:
         max_number_of_turns = 7
     else:
         max_number_of_turns = 6
+    print("Max number of turns set to:", max_number_of_turns)
     for edge in map.DIRECTED_EDGES:
         if edge.src == LoadingBay and edge.dst in [V.B_DOWN_END, V.A_DOWN_END, V.B_UP_END, V.A_UP_END]:
             if edge.start_heading - current_heading == 2 or edge.start_heading - current_heading == -2:
@@ -434,7 +436,6 @@ def seek_and_find(LoadingBay):
         shift_back_without_correction((950//BASE)*40)
     while turn_counter < max_number_of_turns and not emergency_stop:
         c = read_code()
-        print("loading stage:",loading_stage, "turn_counter:", turn_counter)
         FL = (c>>3)&1;  FR = c&1
         mid = (c>>1)&0b11  # inner pair
                 # If all four see white: follow the next route directive
@@ -446,12 +447,13 @@ def seek_and_find(LoadingBay):
             turn_counter_on = False
             sensor_distance1 = vl53l0x_read_distance(setup_sensor1)
             print("Distance:", sensor_distance1)
-            if sensor_distance1 < TARGET_DISTANCE:  # long-range distance sensor needs fixing
-                # tick1 = ticks_ms()
-                # if tick1 - tick0 > 50: #???(debounce?)
-                loading_stage = 1
-                continue
-            
+            if sensor_distance1 != None:
+                if sensor_distance1 < TARGET_DISTANCE:  # long-range distance sensor needs fixing
+                    # tick1 = ticks_ms()
+                    # if tick1 - tick0 > 50: #???(debounce?)
+                    loading_stage = 1
+                    continue
+                
                 
         elif loading_stage == 0:  
             turn_counter_on = True
@@ -566,6 +568,7 @@ def seek_and_find(LoadingBay):
             # unknown/lost -> gentle bias to move forward
             go(BASE, BASE)
         sleep_ms(DT_MS)
+        print("loading stage:",loading_stage, "turn_counter:", turn_counter)
     if current_vertex == V.A_DOWN_BEG:
         current_vertex = V.A_DOWN_END
     elif current_vertex == V.B_UP_BEG:
@@ -579,6 +582,7 @@ def seek_and_find(LoadingBay):
     if current_vertex != V.A_UP_END:
         shift_with_correction((950//BASE)*40)
     return colour
+    
 
 def complete_route(branch_route):
     global current_heading
@@ -632,7 +636,7 @@ def complete_route(branch_route):
                 continue
 
             elif action == 'B':
-                turning = 'B'
+                turning = 'B''
                 t0 = ticks_ms()
                 branch_index += arc('B')                 # branch_index += arc() will consume this route entry
                 sleep_ms(DT_MS)
