@@ -353,7 +353,7 @@ def spin(deg):
     time_ms_min = (distance*0.6 / (SPIN_BASE * 0.25)) * 1000  # time in ms
     time_ms_max = (distance*0.75 / (SPIN_BASE * 0.25)) * 1000  # time in ms
     c = read_code()
-    while (ticks_diff(ticks_ms(), tick0) < time_ms_min or c != 0b0110) and ticks_diff(ticks_ms(), tick0) < time_ms_max:
+    while (ticks_diff(ticks_ms(), tick0) < time_ms_min or (c != 0b0110 and c != 0b0111 and c != 0b1110 and c != 0b1111)) and ticks_diff(ticks_ms(), tick0) < time_ms_max:
         c = read_code()
         if deg > 0:
             spin_right()
