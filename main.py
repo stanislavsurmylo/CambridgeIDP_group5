@@ -51,12 +51,12 @@ LOOP_DELAY = 0.2
 
 
 # ----- TUNING -----
-BASE  = 50    # straight speed
+BASE  = 70    # straight speed
 SPIN_BASE = 50
 LOAD_BASE = 40
 SEEK_COEFF = 0.5  # how aggressively to seek line
-DELTA = 17    # small correction to reach 0110
-HARD  = 30    # strong correction when far(turns)
+DELTA = BASE*20//70    # small correction to reach 0110
+HARD  = BASE*30    # strong correction when far(turns)
 TURN_OUT = 100 # arc outer wheel speed
 TURN_IN  = 0 # arc inner wheel speed
 DEBOUNCE = 3  # front trigger must persist N cycles
@@ -334,8 +334,7 @@ def arc(side):
 
 def go_spin_left(deg):
     shift_with_correction((950//BASE)*40)  # move forward length of line
-    spin_left()   # inner slower
-    spin_sleep(deg)
+    spin(-90)
 
 
 
@@ -343,23 +342,30 @@ def turn_sleep(deg, speed):
     distance = (deg / 180) * 3.14 * RADIUS_OF_TURN  # distance to travel
     time_ms = (distance / (speed * 0.25)) * 1000 # time in ms
     sleep_ms(int(time_ms))
+    
 
-def spin_sleep(deg):
-    distance = (deg / 180) * 3.14 * RADIUS_OF_TURN  # distance to travel
-    time_ms = (distance*0.70 / (SPIN_BASE * 0.25)) * 1000 * 0.9  # time in ms
-    sleep_ms(int(time_ms))
-
+def spin(deg)
+    if deg > 0:
+        distance = (deg / 180) * 3.14 * RADIUS_OF_TURN  # distance to travel
+    else:
+        distance = (-deg / 180) * 3.14 * RADIUS_OF_TURN  # distance to travel
+    tick0 = ticks_ms()
+    time_ms_min = (distance*0.6 / (SPIN_BASE * 0.25)) * 1000  # time in ms
+    time_ms_max = (distance*0.75 / (SPIN_BASE * 0.25)) * 1000  # time in ms
+    while (ticks_diff(ticks_ms(), tick0) < time_ms_min or c != 0b0110) and ticks_diff(ticks_ms(), tick0) < time_ms_max:
+        if deg > 0:
+            spin_right()
+        else:
+            spin_left()
 
 def centered(c):   return c == 0b0110
 def slight_left(c):  return c == 0b0100
 def slight_right(c): return c == 0b0010
 def spin_back():
     if current_vertex in [V.B_DOWN_BEG, V.B_DOWN_END, V.A_UP_BEG, V.A_UP_END]:
-        spin_left()
-        spin_sleep(180)
+        spin(-180)
     else:
-        spin_right()
-        spin_sleep(180)
+        spin(180)
 
 
 def path_to_route(path):
@@ -418,11 +424,13 @@ def seek_and_find(LoadingBay):
     global loading_state
     global zone
     global number_of_bay
+    global BASE
     loading_stage = 0
     turn_counter_on = True
+    number_of_bay_on = True
     turn_counter = 0
     colour = None  # Initialize colour variable
-    number_of_bay = (number_of_bay + 1) % len(loading_bays)
+    number_of_bay = number_of_bay + 1
     if LoadingBay in [V.B_DOWN_BEG, V.A_DOWN_BEG]:
         max_number_of_turns = 7
     else:
@@ -434,7 +442,7 @@ def seek_and_find(LoadingBay):
                 spin_back()
     if LoadingBay == V.B_UP_BEG:
         shift_back_without_correction((950//BASE)*40)
-    while turn_counter < max_number_of_turns and not emergency_stop:
+    while turn_counter < max_number_of_turns and not emergency_stop or (loading_stage != 0 and loading_stage != 4):
         c = read_code()
         FL = (c>>3)&1;  FR = c&1
         mid = (c>>1)&0b11  # inner pair
@@ -464,6 +472,7 @@ def seek_and_find(LoadingBay):
         #     continue
 
         if c == 0b1110 and loading_stage == 1:
+            BASE = 50
             go_spin_left(90)                 # branch_index += arc() will consume this route entry
             sleep_ms(DT_MS)
             loading_stage = 2
@@ -486,11 +495,13 @@ def seek_and_find(LoadingBay):
             if delta_tick > 3000:  # timeout after 2 seconds
                 print("Timeout: No object detected within 2 seconds, resetting to stage 0")
                 shift_back_without_correction((16//5.5)*((950//BASE)*40))
-                spin_right()
-                spin_sleep(90)
+                spin(90)
                 loading_stage = 0
+                BASE = 70
+            
             
         elif loading_stage == 3:
+            BASE = 70  # reset speed after seeking
             # Run the loading pipeline state machine until it either
             # completes a lift or decides to reset the cycle.
             # Reset the state machine for a new loading cycle (ensures clean state for next cycle)
@@ -529,13 +540,7 @@ def seek_and_find(LoadingBay):
             colour = loading_state.detected_color
             print("State machine detected color:", colour)
             shift_back_without_correction((16//5.5)*((950//BASE)*40))
-            if current_vertex in [V.A_DOWN_BEG, V.B_UP_BEG]:
-                spin_right()
-                spin_sleep(90)
-            elif current_vertex in [V.B_DOWN_BEG, V.A_UP_BEG]:
-                spin_left()
-                spin_sleep(90)
-                turn_counter = max_number_of_turns + 1 - turn_counter
+            spin(90)
             loading_stage = 4
 
 
@@ -545,11 +550,14 @@ def seek_and_find(LoadingBay):
             turn_counter_on = False
             sensor_distance1 = vl53l0x_read_distance(setup_sensor1)
             print("Distance:", sensor_distance1)
-            if sensor_distance1 < TARGET_DISTANCE:  # long-range distance sensor needs fixing
-                # tick1 = ticks_ms()
-                # if tick1 - tick0 > 50: #???(debounce?)
-                number_of_bay = (number_of_bay - 1) % len(loading_bays)
-                continue
+            if sensor_distance1 != None:
+                if sensor_distance1 < TARGET_DISTANCE:  # long-range distance sensor needs fixing
+                    # tick1 = ticks_ms()
+                    # if tick1 - tick0 > 50: #???(debounce?)
+                    if number_of_bay_on:
+                        number_of_bay = number_of_bay - 1
+                        number_of_bay_on = False
+                    continue
             
         elif loading_stage == 4:
             turn_counter_on = True
@@ -573,14 +581,12 @@ def seek_and_find(LoadingBay):
         current_vertex = V.A_DOWN_END
     elif current_vertex == V.B_UP_BEG:
         current_vertex = V.B_UP_END
-    elif loading_stage == 4:
-        current_heading = 2
     elif current_vertex == V.B_DOWN_BEG:
         current_vertex = V.B_DOWN_END
     else:
         current_vertex = V.A_UP_END
     if current_vertex != V.A_UP_END:
-        shift_with_correction((950//BASE)*40)
+        shift_with_correction((950//BASE)*40*3)
     return colour
     
 
@@ -592,14 +598,14 @@ def complete_route(branch_route):
 
     # if branch_route[branch_index] == 'R':
     #     spin_right()
-    #     spin_sleep(90)
+    #     spin_sleep_90()
     # elif branch_route[branch_index] == 'L':
     #     spin_left()
-    #     spin_sleep(90)
+    #     spin_sleep_90()
     if branch_route[branch_index] == 'B':
         spin_back()
     if current_vertex == V.A_UP_END:
-        shift_back_without_correction((950//BASE)*40)
+        shift_back_without_correction((3)*(950//BASE)*40)
     branch_index = 1
 
     turning = None
@@ -636,7 +642,7 @@ def complete_route(branch_route):
                 continue
 
             elif action == 'B':
-                turning = 'B''
+                turning = 'B'
                 t0 = ticks_ms()
                 branch_index += arc('B')                 # branch_index += arc() will consume this route entry
                 sleep_ms(DT_MS)
@@ -752,7 +758,6 @@ def go_to(finish_vertex):
     print('Branch route:', branch_route)
     complete_route(branch_route)
     current_vertex = finish_vertex
-
     print("Path:", current_path)
     print("Route:", branch_route)
 
@@ -760,10 +765,9 @@ if current_vertex in [V.A_DOWN_BEG, V.B_DOWN_BEG, V.A_DOWN_END, V.B_DOWN_END]:
     zone = 'down'
 else:
     zone = 'up'
-loading_bays = [V.B_DOWN_BEG, V.B_UP_BEG, V.A_UP_BEG, V.B_DOWN_BEG]  # list of loading bay vertices
+loading_bays = [V.B_DOWN_BEG, V.A_DOWN_BEG, V.A_UP_BEG, V.B_UP_BEG]  # list of loading bay vertices
 boxes_delivered = 0
 number_of_bay = 0
-last_checked_bay = loading_bays[0]
 
 def color_to_vertex(color: str) -> V:
     """
@@ -783,7 +787,6 @@ from linear_actuator import unload_robot
 
 def main():
     global current_vertex
-    global last_checked_bay
     global boxes_delivered
     global number_of_bay
     global emergency_stop
@@ -824,7 +827,7 @@ def main():
     sm_yellow.active(1)
     print("Robot started! LED blinking.")
 
-    while boxes_delivered < 4:
+    while boxes_delivered < 8:
 
         # If paused by button, stop motors and keep LED off
         if emergency_stop:
@@ -860,9 +863,9 @@ def main():
             actuator = Actuator(ACTUATOR_DIR_PIN, ACTUATOR_PWM_PIN)
             global_actuator = actuator  # Update global reference
             if number_of_bay in [0, 1]:
-                loading_pipeline_state_machine.initialize_actuator_down(actuator)
+                loading_pipeline_state_machine.initialize_actuator_down(actuator, 'down')
             else:
-                loading_pipeline_state_machine.initialize_actuator_up(actuator)
+                loading_pipeline_state_machine.initialize_actuator_up(actuator, 'up')
             init_distance_unlock = True
             emergency_stop = False  # Ensure we continue after initialization
             # Go back to the top of the loop; next iteration will do movement.
@@ -870,7 +873,7 @@ def main():
             continue
 
         # Move to the last loading bay spot and check for boxes.
-        go_to(last_checked_bay)
+        go_to(loading_bays[number_of_bay])
         print('1')
         found_color = seek_and_find(loading_bays[number_of_bay])
         # found_color now contains the color detected by state machine in loading_stage == 3
@@ -880,13 +883,15 @@ def main():
             print("Delivering to:", delivery_area)
             go_to(delivery_area)  # go to delivery area
             boxes_delivered += 1 # increment boxes delivered
-            shift_with_correction((12//5.5)*((950//BASE)*40))
+            shift_with_correction((1.5)*((950//BASE)*40))
             go(0, 0)
             unload_robot() # unload any boxes we have
             shift_back_without_correction((950//BASE)*40)
-            go(0,0)       # Prepare for the next round: force the next loop iteration to
+            print('Number of bay:', number_of_bay)
+                   # Prepare for the next round: force the next loop iteration to
         # run the actuator initialization cycle again.
         init_distance_unlock = False
+        go(0,0)
 
 
     go_to(V.START)
@@ -918,13 +923,13 @@ def shift_to_the_box():
 #     # print("Unloading complete")
     
 #     global current_vertex
-#     global last_checked_bay
+#     global loading_bays[number_of_bay]
 #     global boxes_delivered
 #     global number_of_bay
 
 #     while boxes_delivered < 2:
 
-#         go_to(last_checked_bay)
+#         go_to(loading_bays[number_of_bay])
 #         print(current_vertex)
 #         # we go to last loading bay spot and check if there are any boxes in there. If there are, we pick them up and transport them.
 #         if True: #if we found any boxes there
@@ -933,7 +938,7 @@ def shift_to_the_box():
 #             boxes_delivered += 1 # increment boxes delivered
 #             unload_robot() # unload any boxes we have
 #             number_of_bay = (number_of_bay + 1) % len(loading_bays) # set target to next bay
-#             last_checked_bay = loading_bays[number_of_bay]
+#             loading_bays[number_of_bay] = loading_bays[number_of_bay]
 
 
 #     go_to(V.START)

@@ -168,7 +168,7 @@ DIRECTED_EDGES = [
     DirectedEdge(src=V.RAMP       , dst=V.DOWN_LEFT  , start_heading=0, turn='L', end_heading=3, cost=8.0),
     DirectedEdge(src=V.RAMP       , dst=V.DOWN_RIGHT , start_heading=0, turn='R', end_heading=1, cost=8.0),
 
-    DirectedEdge(src=V.UP_RIGHT   , dst=V.B_UP_BEG   , start_heading=1, turn='L', end_heading=0, cost=3.0),
+    DirectedEdge(src=V.UP_RIGHT   , dst=V.B_UP_END   , start_heading=1, turn='L', end_heading=0, cost=3.0),
     DirectedEdge(src=V.UP_RIGHT   , dst=V.RAMP       , start_heading=3, turn='R', end_heading=0, cost=5.0),
     DirectedEdge(src=V.UP_RIGHT   , dst=V.UP_LEFT    , start_heading=3, turn='F', end_heading=3, cost=2.0),
 
@@ -254,9 +254,11 @@ def shortest_path(graph: AdjList, start: "V", finish: "V") -> List["V"]:
 # ------------------------------------------------------------
 # Example usage (assuming V.START and V.BLUE exist)
 # ------------------------------------------------------------
-if __name__ == "__main__":
-     start = V.B_UP_END         # any START vertex
-     finish = V.GREEN          # any FINISH vertex
+def main():
+    start = V.YELLOW         # any START vertex
+    finish = V.A_DOWN_BEG          # any FINISH vertex
 
-     path = shortest_path(GRAPH, start, finish)
-    #  print("Shortest path:", path)  
+    path = shortest_path(GRAPH, start, finish)
+    print("Shortest path:", path)  
+
+main()

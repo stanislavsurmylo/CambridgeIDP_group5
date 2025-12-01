@@ -31,8 +31,7 @@ def unload_robot():
 
     DIR_PIN = 3
     PWM_PIN = 2
-    TEST_DURATION = 7.3  # 1 second for testing
-
+    TEST_DURATION = 12  # 1 second for testing
     
 
     # Unloading robot to reduce weight on actuator

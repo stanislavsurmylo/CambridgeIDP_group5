@@ -28,7 +28,7 @@ ACTUATOR_DIR_PIN = 3
 ACTUATOR_PWM_PIN = 2
 
 # Timing constants
-INIT_RETRACT_TIME = 5.0  # Retract to bottommost position
+INIT_RETRACT_TIME = 10.0  # Retract to bottommost position
 ZONE_DOWN_EXTEND_TIME = 7.3 # Extend to default position for zone_down
 ZONE_UP_EXTEND_TIME = 0.0  # Extend to default position for zone_up
 LIFT_TIME = 3.0  # Base lift time when starting loading
@@ -51,7 +51,7 @@ def get_zone_extend_time(zone):
     return 0.0
     
 def initialize_actuator_down(actuator, zone):
-    actuator.retract(speed=100)  # Maximum speed
+    actuator.retract(speed=ACTUATOR_SPEED)  # Maximum speed
     sleep(INIT_RETRACT_TIME)
     actuator.stop()
     sleep(0.1)
@@ -64,8 +64,8 @@ def initialize_actuator_down(actuator, zone):
     actuator.stop()
     sleep(0.1)
     print("Actuator initialization complete. Ready for loading.\n")
-
-def initialize_actuator_up(actuator, zone=LOADING_ZONE):
+1
+def initialize_actuator_up(actuator, zone='down'):
     actuator.retract(speed=100)  # Maximum speed
     sleep(INIT_RETRACT_TIME)
     actuator.stop()
