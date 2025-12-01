@@ -15,8 +15,7 @@ from loading_pipeline_state_machine import LoadingPipelineState, pipeline_step
 
 PIN_YELLOW = 17
 BUTTON_PIN = 14 
-
-LOADING_ZONE = 1  # zone down = 1, zone up = 2
+ # zone down = 1, zone up = 2
 
 # I2C pins shared with TMF8701
 I2C_ID = 0
@@ -141,6 +140,22 @@ color_power = Pin(COLOR_POWER_PIN, Pin.OUT, value=0)
 
 # Global variable to store initialized sensor (singleton pattern)
 _setup_sensor2 = None
+
+def actuator_slope_up():
+    actuator = Actuator(ACTUATOR_DIR_PIN, ACTUATOR_PWM_PIN)
+    actuator.extend(speed=100)
+    sleep(1)
+    actuator.stop()
+    sleep(1)
+    print("Actuator slope up complete")
+
+def actuator_slope_down():
+    actuator = Actuator(ACTUATOR_DIR_PIN, ACTUATOR_PWM_PIN)
+    actuator.retract(speed=100)
+    sleep(1)
+    actuator.stop()
+    sleep(1)
+    print("Actuator slope down complete")
 
 def setup_sensor_tmf8701():
     global _setup_sensor2
@@ -318,7 +333,7 @@ def arc(side):
     return add_branch_index
 
 def go_spin_left(deg):
-    shift_with_correction((940//BASE)*40)  # move forward length of line
+    shift_with_correction((950//BASE)*40)  # move forward length of line
     spin_left()   # inner slower
     spin_sleep(deg)
 
@@ -512,8 +527,13 @@ def seek_and_find(LoadingBay):
             colour = loading_state.detected_color
             print("State machine detected color:", colour)
             shift_back_without_correction((16//5.5)*((950//BASE)*40))
-            spin_right()
-            spin_sleep(90)
+            if current_vertex in [V.A_DOWN_BEG, V.B_UP_BEG]:
+                spin_right()
+                spin_sleep(90)
+            elif current_vertex in [V.B_DOWN_BEG, V.A_UP_BEG]:
+                spin_left()
+                spin_sleep(90)
+                turn_counter = max_number_of_turns + 1 - turn_counter
             loading_stage = 4
 
 
@@ -550,12 +570,14 @@ def seek_and_find(LoadingBay):
         current_vertex = V.A_DOWN_END
     elif current_vertex == V.B_UP_BEG:
         current_vertex = V.B_UP_END
+    elif loading_stage == 4:
+        current_heading = 2
     elif current_vertex == V.B_DOWN_BEG:
         current_vertex = V.B_DOWN_END
     else:
         current_vertex = V.A_UP_END
     if current_vertex != V.A_UP_END:
-        shift_back_without_correction((940//BASE)*40)
+        shift_with_correction((950//BASE)*40)
     return colour
 
 def complete_route(branch_route):
@@ -712,7 +734,7 @@ def complete_route(branch_route):
         sleep_ms(DT_MS)
     # go(BASE, BASE)
     # sleep_ms(800)
-    shift_back_without_correction((940//BASE)*40)
+    shift_with_correction((950//BASE)*40)
     current_heading = finish_heading
 
 
@@ -780,7 +802,8 @@ def main():
     print("Initializing TMF8701 sensor...")
     sleep_ms(500)  # Give hardware time to stabilize
     setup_sensor2 = setup_sensor_tmf8701()
-    loading_state = LoadingPipelineState(tmf8701=setup_sensor2)
+    # Pass the current zone from main.py into the loading pipeline state machine
+    loading_state = LoadingPipelineState(loading_zone=zone, tmf8701=setup_sensor2)
     print("Sensor initialization complete.")
 
     actuator = Actuator(ACTUATOR_DIR_PIN, ACTUATOR_PWM_PIN)

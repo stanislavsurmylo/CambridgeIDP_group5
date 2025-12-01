@@ -6,7 +6,7 @@ from linear_actuator import Actuator
 from libs.tmf8701 import DFRobot_TMF8701
 
 # Zone configuration: "zone_down" or "zone_up"
-LOADING_ZONE = 1  # zone down = 1, zone up = 2
+  # zone down = 1, zone up = 2
 
 # I2C pins shared with TMF8701
 I2C_ID = 0
@@ -29,8 +29,8 @@ ACTUATOR_PWM_PIN = 2
 
 # Timing constants
 INIT_RETRACT_TIME = 5.0  # Retract to bottommost position
-ZONE_DOWN_EXTEND_TIME = 6.3 # Extend to default position for zone_down
-ZONE_UP_EXTEND_TIME = 6.3  # Extend to default position for zone_up
+ZONE_DOWN_EXTEND_TIME = 7.3 # Extend to default position for zone_down
+ZONE_UP_EXTEND_TIME = 0.0  # Extend to default position for zone_up
 LIFT_TIME = 3.0  # Base lift time when starting loading
 ACTUATOR_SPEED = 50
 
@@ -43,14 +43,14 @@ LOOP_DELAY = 0.2
 INITIAL_SKIP_COUNT = 3  # Skip first N readings
 INITIAL_DELAY_MS = 1000  # Wait N milliseconds before starting measurement
 
-def get_zone_extend_time(zone=LOADING_ZONE):
-    if zone == 1:
+def get_zone_extend_time(zone):
+    if zone == 'down':
         return ZONE_DOWN_EXTEND_TIME
-    if zone == 2:
+    if zone == 'up':
         return ZONE_UP_EXTEND_TIME
     return 0.0
     
-def initialize_actuator_down(actuator, zone=LOADING_ZONE):
+def initialize_actuator_down(actuator, zone):
     actuator.retract(speed=100)  # Maximum speed
     sleep(INIT_RETRACT_TIME)
     actuator.stop()
@@ -65,7 +65,7 @@ def initialize_actuator_down(actuator, zone=LOADING_ZONE):
     sleep(0.1)
     print("Actuator initialization complete. Ready for loading.\n")
 
-def initialize_actuator_up(actuator, zone=LOADING_ZONE):
+def initialize_actuator_up(actuator, zone):
     actuator.retract(speed=100)  # Maximum speed
     sleep(INIT_RETRACT_TIME)
     actuator.stop()
@@ -73,9 +73,9 @@ def initialize_actuator_up(actuator, zone=LOADING_ZONE):
     print("Reached bottommost position")
     # Set default position based on zone
     zone_extend_time = get_zone_extend_time(zone)
-    print("Setting default position for zone {} (extending for {} seconds)...".format(zone, zone_extend_time - 5.5))
+    print("Setting default position for zone {} (extending for {} seconds)...".format(zone, zone_extend_time))
     actuator.extend(speed=ACTUATOR_SPEED)
-    sleep(zone_extend_time - 5.5)
+    sleep(zone_extend_time)
     actuator.stop()
     sleep(0.1)
     print("Actuator initialization complete. Ready for loading.\n")
@@ -103,24 +103,47 @@ def setup_sensor_tcs3472():
     sensor = tcs3472(i2c_bus_tcs3472)
     return sensor
 
-def detect_color(rgb, light):
-    r, g, b = rgb
-    if light < 50 or (r == 0 and g == 0 and b == 0):
-        return "DARK"
-    total = r + g + b
-    r_ratio = r / total
-    g_ratio = g / total
-    b_ratio = b / total
+def detect_color(rgb, light, zone):
+    if zone == 'down':
+        r, g, b = rgb
+        if light < 50 or (r == 0 and g == 0 and b == 0):
+            return "DARK"
+        total = r + g + b
+        r_ratio = r / total
+        g_ratio = g / total
+        b_ratio = b / total
 
-    if r_ratio > 0.2 and g_ratio > 0.2:
-        return "YELLOW"
-    if r_ratio > 0.33 and r > 80:
-        return "RED"
-    if g_ratio > 0.33 and g > 60:
-        return "GREEN"
+        if r_ratio > 0.2 and g_ratio > 0.2:
+           return "YELLOW"
+        if r_ratio > 0.33 and r > 80:
+           return "RED"
+        if g_ratio > 0.33 and g > 60:
+           return "GREEN"
+        if b_ratio > 0.33 and b > 80:
+           return "BLUE"
+        return "UNKNOWN"
+
+    if zone == 'up':
+        r, g, b = rgb
+        if light < 50 or (r == 0 and g == 0 and b == 0):
+            return "DARK"
+        total = r + g + b
+        r_ratio = r / total
+        g_ratio = g / total
+        b_ratio = b / total
+    
+        if r_ratio > 0.3 and g_ratio > 0.3:
+            return "YELLOW"
+        if r_ratio > 0.33 and r > 100:
+            return "RED"    
+        if g_ratio > 0.33 and g > 80:
+            return "GREEN"
+        if b_ratio > 0.33 and b > 100:
+            return "BLUE"
+        return "UNKNOWN"
+    # Fallback classification (should rarely be used)
     if b_ratio > 0.33 and b > 80:
         return "BLUE"
-
     return "UNKNOWN"
     
 def sample_color(power_ctrl, tcs3472_sensor=None):
@@ -159,7 +182,7 @@ def read_distance_cm(sensor):
 class LoadingPipelineState:
     """Holds hardware references and per-cycle flags for the loading pipeline."""
 
-    def __init__(self, loading_zone=LOADING_ZONE, loop_delay=LOOP_DELAY, tmf8701=None, actuator=None, tcs3472=None):
+    def __init__(self, loading_zone="down", loop_delay=LOOP_DELAY, tmf8701=None, actuator=None, tcs3472=None):
         self.loading_zone = loading_zone
         self.loop_delay = loop_delay
         self.color_power = Pin(COLOR_POWER_PIN, Pin.OUT, value=0)
@@ -231,7 +254,8 @@ def pipeline_step(state):
                 state.color_power.value(1)
                 light, rgb = sample_color(state.color_power, state.tcs3472)
                 global color
-                color = detect_color(rgb, light)
+                # Use the zone passed in from main.py via state.loading_zone
+                color = detect_color(rgb, light, state.loading_zone)
                 print("Light:", light, "RGB:", rgb, "Detected color:", color)
                 state.color_sampled = True
                 state.detected_color = color
