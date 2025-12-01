@@ -43,7 +43,7 @@ def unload_robot():
     sleep(TEST_DURATION)
     actuator.stop()
     print("Unloading complete")
-    sleep(2)  # Pause so you can measure
+    sleep(0.2)  # Pause so you can measure
 
 
 if __name__ == "__main__":

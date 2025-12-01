@@ -144,17 +144,17 @@ _setup_sensor2 = None
 def actuator_slope_up():
     actuator = Actuator(ACTUATOR_DIR_PIN, ACTUATOR_PWM_PIN)
     actuator.extend(speed=100)
-    sleep(1)
+    sleep(0.1)
     actuator.stop()
-    sleep(1)
+    sleep(0.1)
     print("Actuator slope up complete")
 
 def actuator_slope_down():
     actuator = Actuator(ACTUATOR_DIR_PIN, ACTUATOR_PWM_PIN)
     actuator.retract(speed=100)
-    sleep(1)
+    sleep(0.1)
     actuator.stop()
-    sleep(1)
+    sleep(0.1)
     print("Actuator slope down complete")
 
 def setup_sensor_tmf8701():
@@ -344,7 +344,7 @@ def turn_sleep(deg, speed):
     sleep_ms(int(time_ms))
     
 
-def spin(deg)
+def spin(deg):
     if deg > 0:
         distance = (deg / 180) * 3.14 * RADIUS_OF_TURN  # distance to travel
     else:
@@ -352,7 +352,9 @@ def spin(deg)
     tick0 = ticks_ms()
     time_ms_min = (distance*0.6 / (SPIN_BASE * 0.25)) * 1000  # time in ms
     time_ms_max = (distance*0.75 / (SPIN_BASE * 0.25)) * 1000  # time in ms
+    c = read_code()
     while (ticks_diff(ticks_ms(), tick0) < time_ms_min or c != 0b0110) and ticks_diff(ticks_ms(), tick0) < time_ms_max:
+        c = read_code()
         if deg > 0:
             spin_right()
         else:
@@ -440,6 +442,7 @@ def seek_and_find(LoadingBay):
         if edge.src == LoadingBay and edge.dst in [V.B_DOWN_END, V.A_DOWN_END, V.B_UP_END, V.A_UP_END]:
             if edge.start_heading - current_heading == 2 or edge.start_heading - current_heading == -2:
                 spin_back()
+                current_heading = edge.end_heading
     if LoadingBay == V.B_UP_BEG:
         shift_back_without_correction((950//BASE)*40)
     while turn_counter < max_number_of_turns and not emergency_stop or (loading_stage != 0 and loading_stage != 4):
@@ -512,6 +515,7 @@ def seek_and_find(LoadingBay):
             result = None
             while True:
                 # Check emergency stop before each step
+
                 if emergency_stop:
                     print("Emergency stop detected in loading_stage 3, breaking out")
                     if global_actuator is not None:
@@ -697,34 +701,6 @@ def complete_route(branch_route):
                 sleep_ms(DT_MS)
                 continue
 
-        # ---- turn state ----
-
-        # if turning:
-        #     # finish when re-centered or inner pair suggests followable track again
-        #     if centered(c) or slight_left(c) or slight_right(c):
-        #         stable += 1
-        #     else:
-        #         stable = 0
-        #     if stable >= STABLE or ticks_diff(ticks_ms(), t0) > MAX_TURN_MS:
-        #         turning = None; stable = 0; go(BASE, BASE); sleep_ms(DT_MS); continue
-        #     branch_index += arc(turning); sleep_ms(DT_MS); 
-        # # completely useless code, delete after testing
-
-
-
-        # ---- detect a branch (outer sensor on one side, inner pair mostly white) ----
-        # if FL and not FR and mid == 0b11:
-        #     fl_cnt += 1; fr_cnt = 0
-        #     if fl_cnt >= DEBOUNCE:
-        #         turning = 'L'; t0 = ticks_ms(); branch_index += arc('L'); sleep_ms(DT_MS); continue
-        # elif FR and not FL and mid == 0b11:
-        #     fr_cnt += 1; fl_cnt = 0
-        #     if fr_cnt >= DEBOUNCE:
-        #         turning = 'R'; t0 = ticks_ms(); arc('R'); sleep_ms(DT_MS); continue
-        # else:
-        #     fl_cnt = fr_cnt = 0
-
-
 
         if centered(c):
             go(BASE, BASE)
@@ -862,7 +838,7 @@ def main():
             
             actuator = Actuator(ACTUATOR_DIR_PIN, ACTUATOR_PWM_PIN)
             global_actuator = actuator  # Update global reference
-            if number_of_bay in [0, 1]:
+            if loading_bays[number_of_bay] in [V.B_DOWN_BEG, V.A_DOWN_BEG]:
                 loading_pipeline_state_machine.initialize_actuator_down(actuator, 'down')
             else:
                 loading_pipeline_state_machine.initialize_actuator_up(actuator, 'up')
@@ -879,18 +855,20 @@ def main():
         # found_color now contains the color detected by state machine in loading_stage == 3
         print("Found color:", found_color)
         if found_color is not None:  # if we found any boxes there
+
             delivery_area = color_to_vertex(found_color)  # map color to vertex
             print("Delivering to:", delivery_area)
             go_to(delivery_area)  # go to delivery area
             boxes_delivered += 1 # increment boxes delivered
-            shift_with_correction((1.5)*((950//BASE)*40))
+            shift_unload()
             go(0, 0)
             unload_robot() # unload any boxes we have
             shift_back_without_correction((950//BASE)*40)
             print('Number of bay:', number_of_bay)
+            init_distance_unlock = False
                    # Prepare for the next round: force the next loop iteration to
-        # run the actuator initialization cycle again.
-        init_distance_unlock = False
+                    # run the actuator initialization cycle again.
+        
         go(0,0)
 
 
@@ -898,51 +876,33 @@ def main():
     shift_to_the_box()
     go(0,0)
 
+def shift_unload():
+    global emergency_stop
+    c = read_code()
+    while c != 0b1111:
+        if emergency_stop:
+            go(0, 0)
+            break
+        c = read_code()
+
+        if centered(c):
+            go(BASE, BASE)
+        elif slight_left(c):          # call the function
+            go(BASE - DELTA, BASE + DELTA)
+        elif slight_right(c):         # call the function
+            go(BASE + DELTA, BASE - DELTA)
+        elif c in (0b1100, 0b1000):   # far to left
+            go(BASE - HARD, BASE + HARD)
+        elif c in (0b0011, 0b0001):   # far to right
+            go(BASE + HARD, BASE - HARD)
+        else:
+            # unknown/lost -> move forward
+            go(BASE, BASE)
+
+        sleep_ms(DT_MS)
+
 def shift_to_the_box():
     pass
-
-
-
-
-
-
-# if __name__ == "__main__":
-#     unload_robot()
-
-
-# def main():
-#     print("Starting main function")
-#     # actuator = Actuator(DIR_PIN, PWM_PIN)
-    
-#     # # Test retract
-#     # actuator.retract(speed=100)
-#     # sleep(5)
-#     # actuator.stop()
-#     # sleep(2)  # Pause so you can measure
-    
-#     # print("Unloading complete")
-    
-#     global current_vertex
-#     global loading_bays[number_of_bay]
-#     global boxes_delivered
-#     global number_of_bay
-
-#     while boxes_delivered < 2:
-
-#         go_to(loading_bays[number_of_bay])
-#         print(current_vertex)
-#         # we go to last loading bay spot and check if there are any boxes in there. If there are, we pick them up and transport them.
-#         if True: #if we found any boxes there
-#             go_to(V.GREEN)  # go to delivery area
-#             print(1)
-#             boxes_delivered += 1 # increment boxes delivered
-#             unload_robot() # unload any boxes we have
-#             number_of_bay = (number_of_bay + 1) % len(loading_bays) # set target to next bay
-#             loading_bays[number_of_bay] = loading_bays[number_of_bay]
-
-
-#     go_to(V.START)
-#     go(0,0)
 
 
 main()

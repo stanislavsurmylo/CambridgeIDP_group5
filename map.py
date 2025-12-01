@@ -151,8 +151,8 @@ DIRECTED_EDGES = [
     DirectedEdge(src=V.B_DOWN_END , dst=V.DOWN_RIGHT , start_heading=0, turn='L', end_heading=3, cost=6.0),
 
     DirectedEdge(src=V.DOWN_RIGHT , dst=V.B_DOWN_END , start_heading=1, turn='R', end_heading=2, cost=6.0),
-    DirectedEdge(src=V.DOWN_RIGHT , dst=V.DOWN_LEFT  , start_heading=3, turn='L', end_heading=2, cost=8.0),
-    DirectedEdge(src=V.DOWN_RIGHT , dst=V.RAMP       , start_heading=3, turn='F', end_heading=3, cost=8.0),
+    DirectedEdge(src=V.DOWN_RIGHT , dst=V.RAMP       , start_heading=3, turn='L', end_heading=2, cost=8.0),
+    DirectedEdge(src=V.DOWN_RIGHT , dst=V.DOWN_LEFT  , start_heading=3, turn='F', end_heading=3, cost=8.0),
 
     DirectedEdge(src=V.A_UP_BEG   , dst=V.UP_LEFT    , start_heading=2, turn='L', end_heading=1, cost=3.0),
     DirectedEdge(src=V.A_UP_BEG   , dst=V.A_UP_END   , start_heading=0, turn='F', end_heading=0, cost=6.0), 
@@ -247,18 +247,62 @@ def shortest_path(graph: AdjList, start: "V", finish: "V") -> List["V"]:
     path.reverse()
     return path
 
+current_heading = 0
 
-
-
+def path_to_route_test(path):
+    global finish_heading
+    route = []
+    prev = path[0]
+    curr = path[1]
+    for edge in DIRECTED_EDGES:
+        if edge.src == prev and edge.dst == curr:
+            if edge.start_heading - current_heading == 1 or edge.start_heading - current_heading == -3:
+                route.append('R')
+            elif edge.start_heading - current_heading == -1 or edge.start_heading - current_heading == 3:
+                route.append('L')
+            elif edge.start_heading - current_heading == 2 or edge.start_heading - current_heading == -2:
+                route.append('B')
+            elif edge.start_heading - current_heading == 0:
+                route.append('F')
+            break
+    for i in range(0, len(path)):
+        if i == 0:
+            continue
+        prev = path[i-1]
+        curr = path[i]
+        if i + 1 < len(path):
+            next = path[i+1]
+        else:
+            next = None
+        # find the directed edge that matches prev -> curr
+        for edge in DIRECTED_EDGES:
+            if edge.src == prev and edge.dst == curr:
+                if next is None:
+                    edge0 = edge
+                if edge.src in [V.B_DOWN_BEG, V.B_DOWN_END, V.A_DOWN_BEG, V.A_DOWN_END] and edge.dst in [V.B_DOWN_BEG, V.B_DOWN_END, V.A_DOWN_BEG, V.A_DOWN_END]:
+                    for i in range(7):
+                        route.append('F')
+                elif edge.src in [V.B_UP_BEG, V.B_UP_END, V.A_UP_BEG, V.A_UP_END] and edge.dst in [V.B_UP_BEG, V.B_UP_END, V.A_UP_BEG, V.A_UP_END]:
+                    for i in range(6):
+                        route.append('F')
+                else:
+                    route.append(edge.turn)
+                    break
+    print(edge.src, edge.dst, edge.start_heading, edge.end_heading)
+    finish_heading = edge0.end_heading  
+        
+    return route
 
 # ------------------------------------------------------------
 # Example usage (assuming V.START and V.BLUE exist)
 # ------------------------------------------------------------
 def main():
-    start = V.YELLOW         # any START vertex
+    start = V.B_DOWN_END         # any START vertex
     finish = V.A_DOWN_BEG          # any FINISH vertex
 
     path = shortest_path(GRAPH, start, finish)
     print("Shortest path:", path)  
+    route = path_to_route_test(path)
+    print("Route:", route)
 
 main()

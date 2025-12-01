@@ -58,9 +58,9 @@ def initialize_actuator_down(actuator, zone):
     print("Reached bottommost position")
     # Set default position based on zone
     zone_extend_time = get_zone_extend_time(zone)
-    print("Setting default position for zone {} (extending for {} seconds)...".format(zone, 7.3))
+    print("Setting default position for zone {} (extending for {} seconds)...".format(zone, 7.4))
     actuator.extend(speed=ACTUATOR_SPEED)
-    sleep(7.3)
+    sleep(7.4)
     actuator.stop()
     sleep(0.1)
     print("Actuator initialization complete. Ready for loading.\n")
