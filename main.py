@@ -589,6 +589,7 @@ def seek_and_find(LoadingBay):
         current_vertex = V.B_DOWN_END
     else:
         current_vertex = V.A_UP_END
+    print("Seek and find complete. Current vertex:", current_vertex)
     if current_vertex != V.A_UP_END:
         shift_with_correction((950//BASE)*40*3)
     return colour
