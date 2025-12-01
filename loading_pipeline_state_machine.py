@@ -132,7 +132,7 @@ def detect_color(rgb, light, zone):
         g_ratio = g / total
         b_ratio = b / total
     
-        if r_ratio > 0.3 and g_ratio > 0.3:
+        if r_ratio > 0.33 and g_ratio > 0.33:
             return "YELLOW"
         if r_ratio > 0.33 and r > 100:
             return "RED"    
