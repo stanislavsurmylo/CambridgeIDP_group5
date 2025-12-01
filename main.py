@@ -307,7 +307,7 @@ def arc(side):
     elif side == 'F':
         add_branch_index += 1        # consume the 'F'
         go(BASE+10,BASE+10)
-        sleep_ms(300)  # move forward length of line
+        sleep_ms(200)  # move forward length of line
         print('F')
 
     else:
@@ -331,7 +331,7 @@ def turn_sleep(deg, speed):
 
 def spin_sleep(deg):
     distance = (deg / 180) * 3.14 * RADIUS_OF_TURN  # distance to travel
-    time_ms = (distance*0.70 / (SPIN_BASE * 0.25)) * 1000 * 0.9  # time in ms
+    time_ms = (distance*0.71 / (SPIN_BASE * 0.25)) * 1000 * 0.9  # time in ms
     sleep_ms(int(time_ms))
 
 
@@ -441,10 +441,15 @@ def seek_and_find(LoadingBay):
         elif loading_stage == 0:  
             turn_counter_on = True
 
+        # if c == 0b1110 and box_found:
+        #     x += arc('L')                 # branch_index += arc() will consume this route entry
+        #     sleep_ms(DT_MS)
+        #     continue
+
         if c == 0b1110 and loading_stage == 1:
             if turn_counter == max_number_of_turns:
                 number_of_bay = (number_of_bay + 1) % len(loading_bays)
-            go_spin_left(90)                 
+            go_spin_left(90)                 # branch_index += arc() will consume this route entry
             sleep_ms(DT_MS)
             loading_stage = 2
             tick0 = ticks_ms()
@@ -856,7 +861,6 @@ def main():
             go(0, 0)
             unload_robot() # unload any boxes we have
             shift_back_without_correction((950//BASE)*40)
-            go(0,0)
         else:
             number_of_bay = (number_of_bay + 1) % len(loading_bays) # set target to next bay
 
@@ -869,7 +873,6 @@ def main():
     shift_to_the_box()
     go(0,0)
 
-def shift_to_the_box():
 def shift_to_the_box():
     pass
 
