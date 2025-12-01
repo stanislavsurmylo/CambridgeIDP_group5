@@ -107,45 +107,78 @@ def blink_1hz():
 #     sleep(1)  # Pause so you can measure
 #     print("Unloading complete")
 
+# Global flags for button control
+robot_started = False  # True after first button press (start)
+emergency_stop = False  # True when paused (after robot has started)
+global_actuator = None  # Global actuator reference for emergency stop
+
 def _button_irq(pin):
-    # One‑shot emergency stop: once pressed, latch stop state.
-    # Keep this very small: just set a flag and stop the motors.
-    global emergency_stop
-    emergency_stop = True
-    mL.stop()
-    mR.stop()
+    global robot_started, emergency_stop, global_actuator
+    if not robot_started:
+        robot_started = True
+        emergency_stop = False
+    else:
+        emergency_stop = not emergency_stop
+        if emergency_stop:
+            mL.stop()
+            mR.stop()
+            # Stop actuator if it exists
+            if global_actuator is not None:
+                try:
+                    global_actuator.stop()
+                except:
+                    pass
 
 # Trigger on falling edge (button pressed to GND when using pull-up)
 button = Pin(BUTTON_PIN, Pin.IN, Pin.PULL_UP)
-emergency_stop = False
 button.irq(trigger=Pin.IRQ_FALLING, handler=_button_irq)
 
 #vl53l0x distance sensor:
 # setup_sensor1 = setup_sensor_vl53l0x()
 
-
-loading_state = LoadingPipelineState()
-
 # colour sensor:
 color_power = Pin(COLOR_POWER_PIN, Pin.OUT, value=0)
 
+# Global variable to store initialized sensor (singleton pattern)
+_setup_sensor2 = None
+
 def setup_sensor_tmf8701():
-    i2c = I2C(I2C_ID, sda=Pin(PIN_SDA), scl=Pin(PIN_SCL))
-    sensor = DFRobot_TMF8701(i2c)
-    if sensor.begin() != 0:
-        raise RuntimeError("TMF8701 initialization failed")
-    if not sensor.start_measurement(sensor.eMODE_NO_CALIB, sensor.eCOMBINE):
-        raise RuntimeError("TMF8701 failed to start measurement")
-    print("TMF8701 distance reader ready.")
-    return sensor
+    global _setup_sensor2
+    # Return existing sensor if already initialized
+    if _setup_sensor2 is not None:
+        return _setup_sensor2
+    
+    try:
+        i2c = I2C(I2C_ID, sda=Pin(PIN_SDA), scl=Pin(PIN_SCL))
+        sensor = DFRobot_TMF8701(i2c)
+        if sensor.begin() != 0:
+            raise RuntimeError("TMF8701 initialization failed")
+        if not sensor.start_measurement(sensor.eMODE_NO_CALIB, sensor.eCOMBINE):
+            raise RuntimeError("TMF8701 failed to start measurement")
+        print("TMF8701 distance reader ready.")
+        _setup_sensor2 = sensor  # Store for reuse
+        return sensor
+    except OSError as e:
+        print(f"I2C error in setup_sensor_tmf8701: {e}")
+        raise
+    except Exception as e:
+        print(f"Error in setup_sensor_tmf8701: {e}")
+        raise
 
 def read_distance_mm(sensor):
-    if sensor.is_data_ready():
-        dist_mm = sensor.get_distance_mm()
-        return dist_mm
+    try:
+        if sensor.is_data_ready():
+            dist_mm = sensor.get_distance_mm()
+            return dist_mm
+    except Exception as e:
+        # Handle I2C timeout or other communication errors
+        print(f"I2C error in read_distance_mm: {e}")
+        return None
     return None
 
-setup_sensor2 = setup_sensor_tmf8701()
+# Global variables for sensor and loading state (initialized in main())
+setup_sensor2 = None
+loading_state = None
 
 
 # ----- SENSORS (left->right). Swap sFL,sFR wires here if needed -----
@@ -369,10 +402,10 @@ def seek_and_find(LoadingBay):
     global loading_state
     global zone
     global number_of_bay
-    colour = 'GREEN'
     loading_stage = 0
     turn_counter_on = True
     turn_counter = 0
+    colour = None  # Initialize colour variable
     if zone == 'down':
         max_number_of_turns = 7
     else:
@@ -409,9 +442,7 @@ def seek_and_find(LoadingBay):
             turn_counter_on = True
 
         if c == 0b1110 and loading_stage == 1:
-            if current_vertex == V.B_DOWN_BEG and turn_counter == max_number_of_turns - 1:
-                number_of_bay = (number_of_bay + 1) % len(loading_bays)
-            elif turn_counter == max_number_of_turns:
+            if turn_counter == max_number_of_turns:
                 number_of_bay = (number_of_bay + 1) % len(loading_bays)
             go_spin_left(90)                 
             sleep_ms(DT_MS)
@@ -422,33 +453,44 @@ def seek_and_find(LoadingBay):
         elif loading_stage == 2:
             sensor_distance2 = read_distance_mm(setup_sensor2)
             print("Distance:", sensor_distance2)
-            #if sensor_distance2 < COLOUR_DETECTION_DISTANCE:
-            #    light, rgb = loading_pipeline.sample_color(loading_pipeline.color_power)
-            #    colour = loading_pipeline.detect_color(light, rgb)
-            #    print("Detected color:", colour)
-            #    continue             #color sensor needs fixing
             delta_tick = ticks_diff(ticks_ms(), tick0)
+            
+            # Check if object is within pickup distance
             if sensor_distance2 != None:
                 if sensor_distance2 < PICKUP_DISTANCE and sensor_distance2 > 0:
+                    print("Object detected within pickup distance, moving to loading_stage 3")
                     loading_stage = 3
                     continue
-            if delta_tick > 3000:  # timeout after 2 seconds
+            
+            # Timeout handling: if no object detected within 2 seconds, reset
+            if delta_tick > 2000:  # timeout after 2 seconds
+                print("Timeout: No object detected within 2 seconds, resetting to stage 0")
                 shift_back_without_correction((16//5.5)*((950//BASE)*40))
                 spin_right()
                 spin_sleep(90)
                 loading_stage = 0
-                if current_vertex == V.B_DOWN_BEG and turn_counter == max_number_of_turns - 1:
-                    number_of_bay = (number_of_bay - 1) % len(loading_bays)
-                elif turn_counter == max_number_of_turns:
-                    number_of_bay = (number_of_bay - 1) % len(loading_bays)
-
+                continue
             
         elif loading_stage == 3:
             # Run the loading pipeline state machine until it either
             # completes a lift or decides to reset the cycle.
-            go(0,0)
-            sleep_ms(100)
+            # Reset the state machine for a new loading cycle (ensures clean state for next cycle)
+            loading_state.reset_cycle_flags()
+            go(0, 0)  # Stop motors
+            sleep_ms(200)  # Give sensor time to stabilize after stage 2
+            
+            result = None
             while True:
+                # Check emergency stop before each step
+                if emergency_stop:
+                    print("Emergency stop detected in loading_stage 3, breaking out")
+                    if global_actuator is not None:
+                        try:
+                            global_actuator.stop()
+                        except:
+                            pass
+                    break
+                
                 result = pipeline_step(loading_state)
                 print("Loading pipeline step result:", result)
 
@@ -461,7 +503,12 @@ def seek_and_find(LoadingBay):
                     break
 
                 # Any unexpected result: break to avoid hanging
+                print(f"Unexpected result: {result}, breaking out of state machine loop")
                 break
+
+            # Get the detected color from state machine (may be None if no color detected)
+            colour = loading_state.detected_color
+            print("State machine detected color:", colour)
 
             shift_back_without_correction((16//5.5)*((950//BASE)*40))
             if current_vertex in [V.A_DOWN_BEG, V.B_UP_BEG]:
@@ -713,37 +760,83 @@ def main():
     global boxes_delivered
     global number_of_bay
     global emergency_stop
+    global robot_started
     global init_distance_unlock
+    global setup_sensor2
+    global loading_state
+    global global_actuator
 
     # This flag controls whether we've already run the actuator init
     # cycle for the current round. It is reset at the end of each loop
     # so that every round starts with a fresh init cycle.
     init_distance_unlock = False
 
+    # Initialize LED state machine but don't start it yet
     sm_yellow = rp2.StateMachine(0, blink_1hz, freq=2000, set_base=Pin(PIN_YELLOW))
-    sm_yellow.active(1)
+    sm_yellow.active(0)  # LED off initially
+
+    # Initialize sensor after a delay to let hardware stabilize
+    print("Initializing TMF8701 sensor...")
+    sleep_ms(500)  # Give hardware time to stabilize
+    setup_sensor2 = setup_sensor_tmf8701()
+    loading_state = LoadingPipelineState(tmf8701=setup_sensor2)
+    print("Sensor initialization complete.")
 
     actuator = Actuator(ACTUATOR_DIR_PIN, ACTUATOR_PWM_PIN)
+    global_actuator = actuator  # Store global reference for emergency stop
     # loading_pipeline.initialize_actuator_down(actuator)
     actuator_initialized_cycle = True
 
+    # Wait for first button press to start the robot
+    print("Waiting for button press to start...")
+    while not robot_started:
+        sleep_ms(100)  # Wait for button interrupt
+    
+    # Button pressed: start LED blinking and begin robot operation
+    sm_yellow.active(1)
+    print("Robot started! LED blinking.")
+
     while boxes_delivered < 4:
 
-        # If the button has been pressed, perform a one‑shot emergency stop:
-        # stop motors and leave the main loop entirely.
+        # If paused by button, stop motors and keep LED off
         if emergency_stop:
             go(0, 0)
-            break
+            sm_yellow.active(0)  # Stop LED when paused
+            # Stop actuator if it exists
+            if global_actuator is not None:
+                try:
+                    global_actuator.stop()
+                except:
+                    pass
+            sleep_ms(100)  # Small delay to avoid busy waiting
+            continue
+        
+        # Robot is running: ensure LED is blinking
+        sm_yellow.active(1)
 
         # Run the actuator initialization cycle once at the start of each round,
         # then proceed to movement on the next iteration.
         if not init_distance_unlock:
+            # Check emergency stop before initializing actuator
+            if emergency_stop:
+                go(0, 0)
+                sm_yellow.active(0)
+                if global_actuator is not None:
+                    try:
+                        global_actuator.stop()
+                    except:
+                        pass
+                sleep_ms(100)
+                continue
+            
             actuator = Actuator(ACTUATOR_DIR_PIN, ACTUATOR_PWM_PIN)
+            global_actuator = actuator  # Update global reference
             if number_of_bay in [0, 1]:
                 loading_pipeline_state_machine.initialize_actuator_down(actuator)
             else:
                 loading_pipeline_state_machine.initialize_actuator_up(actuator)
             init_distance_unlock = True
+            emergency_stop = False  # Ensure we continue after initialization
             # Go back to the top of the loop; next iteration will do movement.
             print('0')
             continue
@@ -752,15 +845,15 @@ def main():
         go_to(last_checked_bay)
         print('1')
         found_color = seek_and_find(loading_bays[number_of_bay])
-        found_color = 'GREEN'  # before testing without color sensor
+        # found_color now contains the color detected by state machine in loading_stage == 3
         print("Found color:", found_color)
         if found_color is not None:  # if we found any boxes there
             delivery_area = color_to_vertex(found_color)  # map color to vertex
             print("Delivering to:", delivery_area)
             go_to(delivery_area)  # go to delivery area
             boxes_delivered += 1 # increment boxes delivered
-            shift_with_correction((12//5.5)*((950//BASE)*40))
-            go(0,0)
+            shift_with_correction((16//5.5)*((950//BASE)*40))
+            go(0, 0)
             unload_robot() # unload any boxes we have
             shift_back_without_correction((950//BASE)*40)
             go(0,0)
@@ -776,6 +869,7 @@ def main():
     shift_to_the_box()
     go(0,0)
 
+def shift_to_the_box():
 def shift_to_the_box():
     pass
 

@@ -41,7 +41,7 @@ LIFT_REFERENCE_DISTANCE_CM = 3 # Trigger lift phase
 LOOP_DELAY = 0.2
 # Skip initial readings to avoid invalid data (0 values)
 INITIAL_SKIP_COUNT = 3  # Skip first N readings
-INITIAL_DELAY_MS = 2000  # Wait N milliseconds before starting measurement
+INITIAL_DELAY_MS = 1000  # Wait N milliseconds before starting measurement
 
 def get_zone_extend_time(zone=LOADING_ZONE):
     if zone == 1:
