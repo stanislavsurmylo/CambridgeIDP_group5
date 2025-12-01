@@ -406,6 +406,7 @@ def seek_and_find(LoadingBay):
     turn_counter_on = True
     turn_counter = 0
     colour = None  # Initialize colour variable
+    number_of_bay = (number_of_bay + 1) % len(loading_bays)
     if zone == 'down':
         max_number_of_turns = 7
     else:
@@ -447,10 +448,6 @@ def seek_and_find(LoadingBay):
         #     continue
 
         if c == 0b1110 and loading_stage == 1:
-            if current_vertex == V.B_DOWN_BEG and turn_counter == max_number_of_turns - 1:
-                number_of_bay = (number_of_bay + 1) % len(loading_bays)
-            elif turn_counter == max_number_of_turns:
-                number_of_bay = (number_of_bay + 1) % len(loading_bays)
             go_spin_left(90)                 # branch_index += arc() will consume this route entry
             sleep_ms(DT_MS)
             loading_stage = 2
@@ -476,10 +473,6 @@ def seek_and_find(LoadingBay):
                 spin_right()
                 spin_sleep(90)
                 loading_stage = 0
-                if current_vertex == V.B_DOWN_BEG and turn_counter == max_number_of_turns - 1:
-                    number_of_bay = (number_of_bay - 1) % len(loading_bays)
-                elif turn_counter == max_number_of_turns:
-                    number_of_bay = (number_of_bay - 1) % len(loading_bays)
             
         elif loading_stage == 3:
             # Run the loading pipeline state machine until it either
@@ -859,11 +852,7 @@ def main():
             go(0, 0)
             unload_robot() # unload any boxes we have
             shift_back_without_correction((950//BASE)*40)
-            go(0,0)
-        else:
-            number_of_bay = (number_of_bay + 1) % len(loading_bays) # set target to next bay
-
-        # Prepare for the next round: force the next loop iteration to
+            go(0,0)       # Prepare for the next round: force the next loop iteration to
         # run the actuator initialization cycle again.
         init_distance_unlock = False
 
