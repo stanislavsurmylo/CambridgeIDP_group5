@@ -429,10 +429,9 @@ def seek_and_find(LoadingBay):
             if turn_counter_on:
                 turn_counter += 1
             turn_counter_on = False
-            # sensor_distance1 = vl53l0x_read_distance(setup_sensor1)
-            # print("Distance:", sensor_distance1)
-            # if sensor_distance1 < TARGET_DISTANCE:  # long-range distance sensor needs fixing
-            if True:
+            sensor_distance1 = vl53l0x_read_distance(setup_sensor1)
+            print("Distance:", sensor_distance1)
+            if sensor_distance1 < TARGET_DISTANCE:  # long-range distance sensor needs fixing
                 # tick1 = ticks_ms()
                 # if tick1 - tick0 > 50: #???(debounce?)
                 loading_stage = 1
@@ -512,7 +511,6 @@ def seek_and_find(LoadingBay):
             # Get the detected color from state machine (may be None if no color detected)
             colour = loading_state.detected_color
             print("State machine detected color:", colour)
-
             shift_back_without_correction((16//5.5)*((950//BASE)*40))
             spin_right()
             spin_sleep(90)
@@ -522,7 +520,14 @@ def seek_and_find(LoadingBay):
         elif loading_stage == 4 and (c == 0b1110 or c == 0b1111 or c == 0b0111):
             if turn_counter_on:
                 turn_counter += 1
-                turn_counter_on = False
+            turn_counter_on = False
+            sensor_distance1 = vl53l0x_read_distance(setup_sensor1)
+            print("Distance:", sensor_distance1)
+            if sensor_distance1 < TARGET_DISTANCE:  # long-range distance sensor needs fixing
+                # tick1 = ticks_ms()
+                # if tick1 - tick0 > 50: #???(debounce?)
+                number_of_bay = (number_of_bay - 1) % len(loading_bays)
+                continue
             
         elif loading_stage == 4:
             turn_counter_on = True
