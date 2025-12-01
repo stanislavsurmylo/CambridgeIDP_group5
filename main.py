@@ -331,7 +331,7 @@ def turn_sleep(deg, speed):
 
 def spin_sleep(deg):
     distance = (deg / 180) * 3.14 * RADIUS_OF_TURN  # distance to travel
-    time_ms = (distance*0.71 / (SPIN_BASE * 0.25)) * 1000 * 0.9  # time in ms
+    time_ms = (distance*0.70 / (SPIN_BASE * 0.25)) * 1000 * 0.9  # time in ms
     sleep_ms(int(time_ms))
 
 
@@ -447,7 +447,9 @@ def seek_and_find(LoadingBay):
         #     continue
 
         if c == 0b1110 and loading_stage == 1:
-            if turn_counter == max_number_of_turns:
+            if current_vertex == V.B_DOWN_BEG and turn_counter == max_number_of_turns - 1:
+                number_of_bay = (number_of_bay + 1) % len(loading_bays)
+            elif turn_counter == max_number_of_turns:
                 number_of_bay = (number_of_bay + 1) % len(loading_bays)
             go_spin_left(90)                 # branch_index += arc() will consume this route entry
             sleep_ms(DT_MS)
@@ -468,13 +470,16 @@ def seek_and_find(LoadingBay):
                     continue
             
             # Timeout handling: if no object detected within 2 seconds, reset
-            if delta_tick > 2000:  # timeout after 2 seconds
+            if delta_tick > 3000:  # timeout after 2 seconds
                 print("Timeout: No object detected within 2 seconds, resetting to stage 0")
                 shift_back_without_correction((16//5.5)*((950//BASE)*40))
                 spin_right()
                 spin_sleep(90)
                 loading_stage = 0
-                continue
+                if current_vertex == V.B_DOWN_BEG and turn_counter == max_number_of_turns - 1:
+                    number_of_bay = (number_of_bay - 1) % len(loading_bays)
+                elif turn_counter == max_number_of_turns:
+                    number_of_bay = (number_of_bay - 1) % len(loading_bays)
             
         elif loading_stage == 3:
             # Run the loading pipeline state machine until it either
@@ -482,7 +487,7 @@ def seek_and_find(LoadingBay):
             # Reset the state machine for a new loading cycle (ensures clean state for next cycle)
             loading_state.reset_cycle_flags()
             go(0, 0)  # Stop motors
-            sleep_ms(200)  # Give sensor time to stabilize after stage 2
+            sleep_ms(300)  # Give sensor time to stabilize after stage 2
             
             result = None
             while True:
@@ -857,10 +862,11 @@ def main():
             print("Delivering to:", delivery_area)
             go_to(delivery_area)  # go to delivery area
             boxes_delivered += 1 # increment boxes delivered
-            shift_with_correction((16//5.5)*((950//BASE)*40))
+            shift_with_correction((12//5.5)*((950//BASE)*40))
             go(0, 0)
             unload_robot() # unload any boxes we have
             shift_back_without_correction((950//BASE)*40)
+            go(0,0)
         else:
             number_of_bay = (number_of_bay + 1) % len(loading_bays) # set target to next bay
 

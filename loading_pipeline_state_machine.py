@@ -112,13 +112,13 @@ def detect_color(rgb, light):
     g_ratio = g / total
     b_ratio = b / total
 
-    if r_ratio > 0.33 and g_ratio > 0.33:
+    if r_ratio > 0.2 and g_ratio > 0.2:
         return "YELLOW"
-    if r_ratio > 0.33 and r > 100:
+    if r_ratio > 0.33 and r > 80:
         return "RED"
-    if g_ratio > 0.33 and g > 80:
+    if g_ratio > 0.33 and g > 60:
         return "GREEN"
-    if b_ratio > 0.33 and b > 100:
+    if b_ratio > 0.33 and b > 80:
         return "BLUE"
 
     return "UNKNOWN"
