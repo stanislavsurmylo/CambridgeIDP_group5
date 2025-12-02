@@ -791,9 +791,11 @@ def main():
     print("Sensor initialization complete.")
 
     actuator = Actuator(ACTUATOR_DIR_PIN, ACTUATOR_PWM_PIN)
-    global_actuator = actuator  # Store global reference for emergency stop
+    global_actuator = actuator
+    loading_pipeline_state_machine.initialize_actuator_buttom(actuator, 'down')
+      # Store global reference for emergency stop
     # loading_pipeline.initialize_actuator_down(actuator)
-    actuator_initialized_cycle = True
+    
 
     # Wait for first button press to start the robot
     print("Waiting for button press to start...")
@@ -841,8 +843,6 @@ def main():
             global_actuator = actuator  # Update global reference
             if loading_bays[number_of_bay] in [V.B_DOWN_BEG, V.A_DOWN_BEG]:
                 loading_pipeline_state_machine.initialize_actuator_down(actuator, 'down')
-            else:
-                loading_pipeline_state_machine.initialize_actuator_up(actuator, 'up')
             init_distance_unlock = True
             emergency_stop = False  # Ensure we continue after initialization
             # Go back to the top of the loop; next iteration will do movement.

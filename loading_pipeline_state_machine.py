@@ -49,13 +49,14 @@ def get_zone_extend_time(zone):
     if zone == 'up':
         return ZONE_UP_EXTEND_TIME
     return 0.0
-    
-def initialize_actuator_down(actuator, zone):
-    actuator.retract(speed=ACTUATOR_SPEED)  # Maximum speed
-    sleep(INIT_RETRACT_TIME)
+def initialize_actuator_buttom(actuator, zone):
+    actuator.retract(speed=70)  # Maximum speed
+    sleep(7)
     actuator.stop()
     sleep(0.1)
     print("Reached bottommost position")
+
+def initialize_actuator_down(actuator, zone):
     # Set default position based on zone
     zone_extend_time = get_zone_extend_time(zone)
     print("Setting default position for zone {} (extending for {} seconds)...".format(zone, 7.4))
