@@ -39,7 +39,7 @@ def unload_robot():
     
     # Test retract
     print("Retracting for {} seconds...".format(TEST_DURATION))
-    actuator.retract(speed=50)
+    actuator.retract(speed=70)
     sleep(TEST_DURATION)
     actuator.stop()
     print("Unloading complete")

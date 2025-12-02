@@ -28,11 +28,12 @@ ACTUATOR_DIR_PIN = 3
 ACTUATOR_PWM_PIN = 2
 
 # Timing constants
-INIT_RETRACT_TIME = 10.0  # Retract to bottommost position
+ACTUATOR_SPEED = 70
+INIT_RETRACT_TIME = (50/ACTUATOR_SPEED)*10  # Retract to bottommost position
 ZONE_DOWN_EXTEND_TIME = 7.3 # Extend to default position for zone_down
 ZONE_UP_EXTEND_TIME = 0.0  # Extend to default position for zone_up
 LIFT_TIME = 3.0  # Base lift time when starting loading
-ACTUATOR_SPEED = 50
+
 
 MIN_INIT_DISTANCE_CM = 5
 ZONE_PRESET_DISTANCE_CM = 10.0 # Trigger zone preset extend
@@ -49,6 +50,13 @@ def get_zone_extend_time(zone):
     if zone == 'up':
         return ZONE_UP_EXTEND_TIME
     return 0.0
+
+def initialize_actuator_bottom (actuator, zone):   
+    actuator.retract(speed=ACTUATOR_SPEED)  # Maximum speed
+    sleep(INIT_RETRACT_TIME)
+    actuator.stop()
+    sleep(0.1)
+    print("Reached bottommost position")
     
 def initialize_actuator_down(actuator, zone):
     actuator.retract(speed=ACTUATOR_SPEED)  # Maximum speed
@@ -58,9 +66,9 @@ def initialize_actuator_down(actuator, zone):
     print("Reached bottommost position")
     # Set default position based on zone
     zone_extend_time = get_zone_extend_time(zone)
-    print("Setting default position for zone {} (extending for {} seconds)...".format(zone, 7.4))
+    print("Setting default position for zone {} (extending for {} seconds)...".format(zone, (50/ACTUATOR_SPEED)*8))
     actuator.extend(speed=ACTUATOR_SPEED)
-    sleep(7.4)
+    sleep((50/ACTUATOR_SPEED)*8)
     actuator.stop()
     sleep(0.1)
     print("Actuator initialization complete. Ready for loading.\n")
@@ -112,8 +120,9 @@ def detect_color(rgb, light, zone):
         r_ratio = r / total
         g_ratio = g / total
         b_ratio = b / total
+        print("Ratios - R:", r_ratio, "G:", g_ratio, "B:", b_ratio)
 
-        if r_ratio > 0.2 and g_ratio > 0.2:
+        if r_ratio > 0.27 and g_ratio > 0.27:
            return "YELLOW"
         if r_ratio > 0.33 and r > 80:
            return "RED"

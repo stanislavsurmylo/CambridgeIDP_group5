@@ -41,7 +41,7 @@ INIT_RETRACT_TIME = 6.0  # Retract to bottommost position
 ZONE_DOWN_EXTEND_TIME = 3.0  # Extend to default position for zone_down
 ZONE_UP_EXTEND_TIME = 0  # Extend to default position for zone_up
 LIFT_TIME = 3.0  # Base lift time when starting loading
-ACTUATOR_SPEED = 50
+ACTUATOR_SPEED = 70
 
 MIN_INIT_DISTANCE_CM = 5
 ZONE_PRESET_DISTANCE_CM = 10.0 # Trigger zone preset extend
@@ -51,12 +51,12 @@ LOOP_DELAY = 0.2
 
 
 # ----- TUNING -----
-BASE  = 70    # straight speed
+BASE  = 80    # straight speed
 SPIN_BASE = 50
 LOAD_BASE = 40
 SEEK_COEFF = 0.5  # how aggressively to seek line
-DELTA = BASE*20//70    # small correction to reach 0110
-HARD  = BASE*30    # strong correction when far(turns)
+DELTA = 20*(BASE/60)    # small correction to reach 0110
+HARD  = 40*(BASE/60)    # strong correction when far(turns)
 TURN_OUT = 100 # arc outer wheel speed
 TURN_IN  = 0 # arc inner wheel speed
 DEBOUNCE = 3  # front trigger must persist N cycles
@@ -207,8 +207,8 @@ def W(x): return x == WHITE_LEVEL
 
 # branch_route = []  path = list of vertices; route = list of 'L','R','F','B'
 # branch_index = 0
-current_heading = 1
-current_vertex = V.RIGHT
+current_heading = 0
+current_vertex = V.START
 finish_vertex = None
 finish_heading = None
 
@@ -333,7 +333,7 @@ def arc(side):
     return add_branch_index
 
 def go_spin_left(deg):
-    shift_with_correction((950//BASE)*40)  # move forward length of line
+    shift_with_correction((940//BASE)*40)  # move forward length of line
     spin(-90)
 
 
@@ -350,21 +350,24 @@ def spin(deg):
     else:
         distance = (-deg / 180) * 3.14 * RADIUS_OF_TURN  # distance to travel
     tick0 = ticks_ms()
-    time_ms_min = (distance*0.6 / (SPIN_BASE * 0.25)) * 1000  # time in ms
+    time_ms_min = (distance*0.5 / (SPIN_BASE * 0.25)) * 1000  # time in ms
     time_ms_max = (distance*0.75 / (SPIN_BASE * 0.25)) * 1000  # time in ms
     c = read_code()
-    while (ticks_diff(ticks_ms(), tick0) < time_ms_min or (c != 0b0110 and c != 0b1111)) and ticks_diff(ticks_ms(), tick0) < time_ms_max:
+    while ticks_diff(ticks_ms(), tick0) < time_ms_min or (c != 0b0110 and c != 0b1111):
         c = read_code()
+        if c == 0b0110 or c == 0b1111:
+            print("Centered during spin")
         if deg > 0:
             spin_right()
         else:
             spin_left()
+    print('Spin time:', ticks_diff(ticks_ms(), tick0))
 
 def centered(c):   return c == 0b0110
 def slight_left(c):  return c == 0b0100
 def slight_right(c): return c == 0b0010
 def spin_back():
-    if current_vertex in [V.B_DOWN_BEG, V.B_DOWN_END, V.A_UP_BEG, V.A_UP_END]:
+    if current_vertex in [V.B_DOWN_BEG, V.B_DOWN_END, V.A_UP_BEG, V.A_UP_END, V.BLUE]:
         spin(-180)
     else:
         spin(180)
@@ -427,6 +430,8 @@ def seek_and_find(LoadingBay):
     global zone
     global number_of_bay
     global BASE
+    too_straight = False
+    BASE = 60
     loading_stage = 0
     turn_counter_on = True
     number_of_bay_on = True
@@ -445,11 +450,12 @@ def seek_and_find(LoadingBay):
                 current_heading = edge.end_heading
     if LoadingBay == V.B_UP_BEG:
         shift_back_without_correction((950//BASE)*40)
-    while turn_counter < max_number_of_turns and not emergency_stop or (loading_stage != 0 and loading_stage != 4):
+    t1 = ticks_ms()
+    while turn_counter < max_number_of_turns and not emergency_stop or (loading_stage != 0 and loading_stage != 4) and not too_straight:
         c = read_code()
         FL = (c>>3)&1;  FR = c&1
         mid = (c>>1)&0b11  # inner pair
-                # If all four see white: follow the next route directive
+        # If all four see white: follow the next route directive
         #print(branch_index)
         
         if (c == 0b1110 or c == 0b1111) and loading_stage == 0:
@@ -475,12 +481,12 @@ def seek_and_find(LoadingBay):
         #     continue
 
         if c == 0b1110 and loading_stage == 1:
-            BASE = 50
+            BASE = 40
             go_spin_left(90)                 # branch_index += arc() will consume this route entry
             sleep_ms(DT_MS)
             loading_stage = 2
             tick0 = ticks_ms()
-            continue
+            tick1 = ticks_ms()
 
         elif loading_stage == 2:
             sensor_distance2 = read_distance_mm(setup_sensor2)
@@ -492,7 +498,6 @@ def seek_and_find(LoadingBay):
                 if sensor_distance2 < PICKUP_DISTANCE and sensor_distance2 > 0:
                     print("Object detected within pickup distance, moving to loading_stage 3")
                     loading_stage = 3
-                    continue
             
             # Timeout handling: if no object detected within 2 seconds, reset
             if delta_tick > 3000:  # timeout after 2 seconds
@@ -500,11 +505,12 @@ def seek_and_find(LoadingBay):
                 shift_back_without_correction((16//5.5)*((950//BASE)*40))
                 spin(90)
                 loading_stage = 0
-                BASE = 70
+                BASE = 60
+            tick1 = ticks_ms()
             
             
         elif loading_stage == 3:
-            BASE = 70  # reset speed after seeking
+            BASE = 60  # reset speed after seeking
             # Run the loading pipeline state machine until it either
             # completes a lift or decides to reset the cycle.
             # Reset the state machine for a new loading cycle (ensures clean state for next cycle)
@@ -539,6 +545,7 @@ def seek_and_find(LoadingBay):
                 # Any unexpected result: break to avoid hanging
                 print(f"Unexpected result: {result}, breaking out of state machine loop")
                 break
+                tick1 = ticks_ms()
 
             # Get the detected color from state machine (may be None if no color detected)
             colour = loading_state.detected_color
@@ -546,6 +553,7 @@ def seek_and_find(LoadingBay):
             shift_back_without_correction((16//5.5)*((950//BASE)*40))
             spin(90)
             loading_stage = 4
+            tick1 = ticks_ms()
 
 
         elif loading_stage == 4 and (c == 0b1110 or c == 0b1111 or c == 0b0111):
@@ -576,11 +584,20 @@ def seek_and_find(LoadingBay):
             go(BASE-HARD, BASE+HARD)
         elif c in (0b0011, 0b0001): # far to right
             go(BASE+HARD, BASE-HARD)
-        else:
+        elif c == 0b0000:
             # unknown/lost -> gentle bias to move forward
             go(BASE, BASE)
+        else:
+            # all black or unrecognized -> go foward
+            go(BASE, BASE)
+            t1 = ticks_ms()
+        if ticks_diff(ticks_ms(), t1) > 2000:
+            too_straight = True
+            print("Too straight detected, exiting seek and find loop")
         sleep_ms(DT_MS)
-        print("loading stage:",loading_stage, "turn_counter:", turn_counter)
+        # print("loading stage:",loading_stage, "turn_counter:", turn_counter)
+        
+    
     if current_vertex == V.A_DOWN_BEG:
         current_vertex = V.A_DOWN_END
     elif current_vertex == V.B_UP_BEG:
@@ -592,6 +609,7 @@ def seek_and_find(LoadingBay):
     print("Seek and find complete. Current vertex:", current_vertex)
     if current_vertex != V.A_UP_END:
         shift_with_correction((950//BASE)*40*3)
+    BASE = 80  # reset speed
     return colour
     
 
@@ -727,7 +745,7 @@ def complete_route(branch_route):
 
 def go_to(finish_vertex):
     global current_vertex
-    
+    global zone
     graph = map.GRAPH
     current_path = map.shortest_path(graph, current_vertex, finish_vertex)
     print('Current heading:', current_heading)
@@ -735,16 +753,18 @@ def go_to(finish_vertex):
     print('Branch route:', branch_route)
     complete_route(branch_route)
     current_vertex = finish_vertex
+    if current_vertex in [V.A_DOWN_BEG, V.B_DOWN_BEG, V.A_DOWN_END, V.B_DOWN_END]:
+        zone = 'down'
+    else:
+        zone = 'up'
     print("Path:", current_path)
     print("Route:", branch_route)
 
-if current_vertex in [V.A_DOWN_BEG, V.B_DOWN_BEG, V.A_DOWN_END, V.B_DOWN_END]:
-    zone = 'down'
-else:
-    zone = 'up'
+
 loading_bays = [V.B_DOWN_BEG, V.A_DOWN_BEG, V.A_UP_BEG, V.B_UP_BEG]  # list of loading bay vertices
 boxes_delivered = 0
 number_of_bay = 0
+zone = 'down'
 
 def color_to_vertex(color: str) -> V:
     """
@@ -772,7 +792,7 @@ def main():
     global setup_sensor2
     global loading_state
     global global_actuator
-
+    x = True
     # This flag controls whether we've already run the actuator init
     # cycle for the current round. It is reset at the end of each loop
     # so that every round starts with a fresh init cycle.
@@ -803,6 +823,8 @@ def main():
     # Button pressed: start LED blinking and begin robot operation
     sm_yellow.active(1)
     print("Robot started! LED blinking.")
+
+    loading_pipeline_state_machine.initialize_actuator_bottom(actuator, 'down')
 
     while boxes_delivered < 8:
 
@@ -850,7 +872,10 @@ def main():
             continue
 
         # Move to the last loading bay spot and check for boxes.
-        go_to(loading_bays[number_of_bay])
+        # if x:
+        #     shift_with_correction((950//BASE)*40*3)
+        #     x = False
+        # go_to(loading_bays[number_of_bay])
         print('1')
         found_color = seek_and_find(loading_bays[number_of_bay])
         # found_color now contains the color detected by state machine in loading_stage == 3
