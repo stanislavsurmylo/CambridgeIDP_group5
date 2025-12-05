@@ -26,19 +26,35 @@ class Actuator:
 DIR_PIN = 3
 PWM_PIN = 2
 
-def unload_robot():
+def unload_robot(actuator):
 
     DIR_PIN = 3
     PWM_PIN = 2
-    TEST_DURATION = (50/50)*14  # 1 second for testing
+    TEST_DURATION = (50/50)*11  # 1 second for testing
     
 
     # Unloading robot to reduce weight on actuator
-    actuator = Actuator(DIR_PIN, PWM_PIN)
     
     # Test retract
     print("Retracting for {} seconds...".format(TEST_DURATION))
-    actuator.retract(speed=55)
+    actuator.retract(speed=50)
+    sleep(TEST_DURATION)
+    actuator.stop()
+    print("Unloading complete")
+    sleep(0.2)  # Pause so you can measure
+
+def unload_robot_shift(actuator):
+
+    DIR_PIN = 3
+    PWM_PIN = 2
+    TEST_DURATION = (50/50)*4  # 1 second for testing
+    
+
+    # Unloading robot to reduce weight on actuator
+    
+    # Test retract
+    print("Retracting for {} seconds...".format(TEST_DURATION))
+    actuator.retract(speed=50)
     sleep(TEST_DURATION)
     actuator.stop()
     print("Unloading complete")

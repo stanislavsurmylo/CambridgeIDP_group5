@@ -21,16 +21,16 @@ PIN_SCL_TCS3472 = 11
 # TCS3472 power control
 COLOR_POWER_PIN = 0
 COLOR_POWER_STABILIZE_MS = 2000
-COLOR_INTEGRATION_MS =2000
+COLOR_INTEGRATION_MS =2500
 
 # Actuator pins
 ACTUATOR_DIR_PIN = 3
 ACTUATOR_PWM_PIN = 2
 
 # Timing constants
-ACTUATOR_SPEED = 80
+ACTUATOR_SPEED = 60
 INIT_RETRACT_TIME = (50/(ACTUATOR_SPEED*0.66))*12  # Retract to bottommost position
-INIT_EXTEND_TIME = (50/ACTUATOR_SPEED)*8 # Extend to default position for zone_down
+INIT_EXTEND_TIME = (50/ACTUATOR_SPEED)*8.1 # Extend to default position for zone_down
 ZONE_DOWN_EXTEND_TIME = 7.3 # Extend to default position for zone_down
 ZONE_UP_EXTEND_TIME = 0.0  # Extend to default position for zone_up
 LIFT_TIME = 3.0  # Base lift time when starting loading
@@ -87,7 +87,7 @@ def perform_lift(actuator):
     actuator.extend(speed=ACTUATOR_SPEED)
     sleep(LIFT_TIME)
     actuator.stop()
-    sleep(0.5)
+    sleep(0.1)
     print("Lift phase complete.")
 
 def setup_sensor_tmf8701():
@@ -319,8 +319,7 @@ def main():
     Runs until a single loading cycle has either completed a lift
     or been reset, then returns to the caller.
     """
-    initialize_actuator_bottom(actuator=Actuator(ACTUATOR_DIR_PIN, ACTUATOR_PWM_PIN), zone='down')
-    initialize_actuator_down(actuator=Actuator(ACTUATOR_DIR_PIN, ACTUATOR_PWM_PIN), zone='down')
+    
     state = LoadingPipelineState()
     while True:
         result = pipeline_step(state)

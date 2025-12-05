@@ -551,7 +551,15 @@ def seek_and_find(LoadingBay):
                         # Get the detected color from state machine (may be None if no color detected)
             colour = loading_state.detected_color
             print("State machine detected color:", colour)
-            shift_back_without_correction((16//5.5)*((950//BASE)*40))
+            # shift_back_without_correction((15.6//5.5)*((950//BASE)*40))
+            
+            c = read_code()
+            while c != 0b1111:
+                go_back(BASE, BASE)
+                c = read_code()
+            go(0, 0)
+            unload_robot_shift(Actuator(ACTUATOR_DIR_PIN, ACTUATOR_PWM_PIN))
+            shift_with_correction((890/BASE)*40)
             if LoadingBay == V.B_DOWN_BEG:
                 spin(-90)
                 turn_counter = max_number_of_turns + 1 - turn_counter  # exit after this
@@ -747,6 +755,8 @@ def go_to(finish_vertex):
     print('Branch route:', branch_route)
     complete_route(branch_route)
     current_vertex = finish_vertex
+    if current_vertex == V.A_DOWN_BEG:
+        shift_with_correction((950//BASE)*40)
     if current_vertex in [V.A_DOWN_BEG, V.B_DOWN_BEG, V.A_DOWN_END, V.B_DOWN_END]:
         zone = 'down'
     else:
@@ -773,7 +783,7 @@ def color_to_vertex(color: str) -> V:
     raise ValueError(f"Unknown color: {color!r}")
 
 
-from linear_actuator import unload_robot
+from linear_actuator import unload_robot, unload_robot_shift
 
 
 def main():
@@ -882,7 +892,7 @@ def main():
             boxes_delivered += 1 # increment boxes delivered
             shift_unload()
             go(0, 0)
-            unload_robot() # unload any boxes we have
+            unload_robot(actuator) # unload any boxes we have
             shift_back_without_correction((950//BASE)*40)
             print('Number of bay:', number_of_bay)
             init_distance_unlock = False
@@ -925,7 +935,8 @@ def shift_unload():
 
 def shift_to_the_box():
     go(100, 100)
-    sleep_ms(800)
+    sleep_ms(700)
 
-
+loading_pipeline_state_machine.initialize_actuator_bottom(actuator=Actuator(ACTUATOR_DIR_PIN, ACTUATOR_PWM_PIN), zone='down')
+loading_pipeline_state_machine.initialize_actuator_down(actuator=Actuator(ACTUATOR_DIR_PIN, ACTUATOR_PWM_PIN), zone='down')
 main()
