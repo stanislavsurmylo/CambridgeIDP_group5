@@ -62,11 +62,11 @@ TURN_IN  = 0 # arc inner wheel speed
 DEBOUNCE = 3  # front trigger must persist N cycles
 STABLE   = 1  # need N centered readings to finish a turn
 MAX_TURN_MS = 10                                                 
-TARGET_DISTANCE = 250  # target distance in mm   
+  
 COLOUR_DETECTION_DISTANCE = 50  # distance to detect color in mm
 PICKUP_DISTANCE = 40.0  # distance to pick up box in mm
 
-DT_MS = 10
+DT_MS = 5
 
 
 RADIUS_OF_TURN = 16.5  # radius of turn in cm
@@ -333,7 +333,7 @@ def arc(side):
     return add_branch_index
 
 def go_spin_left(deg):
-    shift_with_correction((940//BASE)*40)  # move forward length of line
+    shift_with_correction((950//BASE)*40)  # move forward length of line
     spin(-90)
 
 
@@ -353,7 +353,7 @@ def spin(deg):
     time_ms_min = (distance*0.5 / (SPIN_BASE * 0.25)) * 1000  # time in ms
     time_ms_max = (distance*0.75 / (SPIN_BASE * 0.25)) * 1000  # time in ms
     c = read_code()
-    while ticks_diff(ticks_ms(), tick0) < time_ms_min or (c != 0b0110 and c != 0b1111):
+    while (ticks_diff(ticks_ms(), tick0) < time_ms_min or (c != 0b0110 and c != 0b1111)) and ticks_diff(ticks_ms(), tick0) < time_ms_max:
         c = read_code()
         if c == 0b0110 or c == 0b1111:
             print("Centered during spin")
@@ -430,14 +430,20 @@ def seek_and_find(LoadingBay):
     global zone
     global number_of_bay
     global BASE
-    too_straight = False
+    global boxes_delivered
     BASE = 60
     loading_stage = 0
     turn_counter_on = True
     number_of_bay_on = True
     turn_counter = 0
     colour = None  # Initialize colour variable
-    number_of_bay = number_of_bay + 1
+    if boxes_delivered >= 1 or LoadingBay == V.A_DOWN_BEG:
+        number_of_bay = (number_of_bay + 1) % 3
+    TARGET_DISTANCE = 250  # target distance in mm 
+    if LoadingBay == [V.B_DOWN_BEG]:
+        TARGET_DISTANCE = 245  # target distance in mm 
+    elif LoadingBay == [V.A_DOWN_BEG]:
+        TARGET_DISTANCE = 255  # target distance in mm
     if LoadingBay in [V.B_DOWN_BEG, V.A_DOWN_BEG]:
         max_number_of_turns = 7
     else:
@@ -450,8 +456,8 @@ def seek_and_find(LoadingBay):
                 current_heading = edge.end_heading
     if LoadingBay == V.B_UP_BEG:
         shift_back_without_correction((950//BASE)*40)
-    t1 = ticks_ms()
-    while turn_counter < max_number_of_turns and not emergency_stop or (loading_stage != 0 and loading_stage != 4) and not too_straight:
+    c = read_code()
+    while not emergency_stop and ((turn_counter < max_number_of_turns or (loading_stage != 0 and loading_stage != 4)) or (c == 0b1110 or c == 0b1111)):
         c = read_code()
         FL = (c>>3)&1;  FR = c&1
         mid = (c>>1)&0b11  # inner pair
@@ -461,13 +467,12 @@ def seek_and_find(LoadingBay):
         if (c == 0b1110 or c == 0b1111) and loading_stage == 0:
             if turn_counter_on:
                 turn_counter += 1
+                print("Turn counter increased to:", turn_counter)
             turn_counter_on = False
             sensor_distance1 = vl53l0x_read_distance(setup_sensor1)
             print("Distance:", sensor_distance1)
             if sensor_distance1 != None:
                 if sensor_distance1 < TARGET_DISTANCE:  # long-range distance sensor needs fixing
-                    # tick1 = ticks_ms()
-                    # if tick1 - tick0 > 50: #???(debounce?)
                     loading_stage = 1
                     continue
                 
@@ -486,33 +491,31 @@ def seek_and_find(LoadingBay):
             sleep_ms(DT_MS)
             loading_stage = 2
             tick0 = ticks_ms()
-            tick1 = ticks_ms()
 
         elif loading_stage == 2:
             sensor_distance2 = read_distance_mm(setup_sensor2)
             print("Distance:", sensor_distance2)
-            delta_tick = ticks_diff(ticks_ms(), tick0)
             
             # Check if object is within pickup distance
             if sensor_distance2 != None:
                 if sensor_distance2 < PICKUP_DISTANCE and sensor_distance2 > 0:
                     print("Object detected within pickup distance, moving to loading_stage 3")
+                    delta_back_tick = ticks_diff(ticks_ms(), tick0) - 0.2
                     loading_stage = 3
             
             # Timeout handling: if no object detected within 2 seconds, reset
-            if delta_tick > 3000:  # timeout after 2 seconds
+            if ticks_diff(ticks_ms(), tick0) > 2600:  # timeout after 2 seconds
                 print("Timeout: No object detected within 2 seconds, resetting to stage 0")
                 shift_back_without_correction((16//5.5)*((950//BASE)*40))
                 spin(90)
                 loading_stage = 0
                 BASE = 60
-            tick1 = ticks_ms()
             
             
         elif loading_stage == 3:
             BASE = 60  # reset speed after seeking
             # Run the loading pipeline state machine until it either
-            # completes a lift or decides to reset the cycle.
+            # completes a lift or decides to reset the cycle.delta_back_tick
             # Reset the state machine for a new loading cycle (ensures clean state for next cycle)
             loading_state.reset_cycle_flags()
             go(0, 0)  # Stop motors
@@ -545,31 +548,31 @@ def seek_and_find(LoadingBay):
                 # Any unexpected result: break to avoid hanging
                 print(f"Unexpected result: {result}, breaking out of state machine loop")
                 break
-                tick1 = ticks_ms()
-
-            # Get the detected color from state machine (may be None if no color detected)
+                        # Get the detected color from state machine (may be None if no color detected)
             colour = loading_state.detected_color
             print("State machine detected color:", colour)
             shift_back_without_correction((16//5.5)*((950//BASE)*40))
-            spin(90)
+            if LoadingBay == V.B_DOWN_BEG:
+                spin(-90)
+                turn_counter = max_number_of_turns + 1 - turn_counter  # exit after this
+            else:
+                spin(90)
             loading_stage = 4
-            tick1 = ticks_ms()
-
 
         elif loading_stage == 4 and (c == 0b1110 or c == 0b1111 or c == 0b0111):
             if turn_counter_on:
                 turn_counter += 1
+                print("Turn counter increased to:", turn_counter)
             turn_counter_on = False
-            sensor_distance1 = vl53l0x_read_distance(setup_sensor1)
-            print("Distance:", sensor_distance1)
-            if sensor_distance1 != None:
-                if sensor_distance1 < TARGET_DISTANCE:  # long-range distance sensor needs fixing
-                    # tick1 = ticks_ms()
-                    # if tick1 - tick0 > 50: #???(debounce?)
-                    if number_of_bay_on:
-                        number_of_bay = number_of_bay - 1
-                        number_of_bay_on = False
-                    continue
+            if LoadingBay == V.A_DOWN_BEG:
+                sensor_distance1 = vl53l0x_read_distance(setup_sensor1)
+                print("Distance:", sensor_distance1)
+                if sensor_distance1 != None:
+                    if sensor_distance1 < TARGET_DISTANCE:  # long-range distance sensor needs fixing
+                        if number_of_bay_on:
+                            number_of_bay = (number_of_bay - 1) % 3
+                            number_of_bay_on = False
+                        continue
             
         elif loading_stage == 4:
             turn_counter_on = True
@@ -584,28 +587,19 @@ def seek_and_find(LoadingBay):
             go(BASE-HARD, BASE+HARD)
         elif c in (0b0011, 0b0001): # far to right
             go(BASE+HARD, BASE-HARD)
-        elif c == 0b0000:
+        else:
             # unknown/lost -> gentle bias to move forward
             go(BASE, BASE)
-        else:
-            # all black or unrecognized -> go foward
-            go(BASE, BASE)
-            t1 = ticks_ms()
-        if ticks_diff(ticks_ms(), t1) > 2000:
-            too_straight = True
-            print("Too straight detected, exiting seek and find loop")
         sleep_ms(DT_MS)
         # print("loading stage:",loading_stage, "turn_counter:", turn_counter)
         
     
     if current_vertex == V.A_DOWN_BEG:
         current_vertex = V.A_DOWN_END
-    elif current_vertex == V.B_UP_BEG:
-        current_vertex = V.B_UP_END
-    elif current_vertex == V.B_DOWN_BEG:
-        current_vertex = V.B_DOWN_END
+    elif loading_stage == 4:
+        current_heading = 2
     else:
-        current_vertex = V.A_UP_END
+        current_vertex = V.B_DOWN_END
     print("Seek and find complete. Current vertex:", current_vertex)
     if current_vertex != V.A_UP_END:
         shift_with_correction((950//BASE)*40*3)
@@ -761,7 +755,7 @@ def go_to(finish_vertex):
     print("Route:", branch_route)
 
 
-loading_bays = [V.B_DOWN_BEG, V.A_DOWN_BEG, V.A_UP_BEG, V.B_UP_BEG]  # list of loading bay vertices
+loading_bays = [V.B_DOWN_BEG, V.A_DOWN_BEG, V.START]  # list of loading bay vertices
 boxes_delivered = 0
 number_of_bay = 0
 zone = 'down'
@@ -796,7 +790,7 @@ def main():
     # This flag controls whether we've already run the actuator init
     # cycle for the current round. It is reset at the end of each loop
     # so that every round starts with a fresh init cycle.
-    init_distance_unlock = False
+    init_distance_unlock = True
 
     # Initialize LED state machine but don't start it yet
     sm_yellow = rp2.StateMachine(0, blink_1hz, freq=2000, set_base=Pin(PIN_YELLOW))
@@ -824,9 +818,9 @@ def main():
     sm_yellow.active(1)
     print("Robot started! LED blinking.")
 
-    loading_pipeline_state_machine.initialize_actuator_bottom(actuator, 'down')
+    # loading_pipeline_state_machine.initialize_actuator_bottom(actuator, 'down')
 
-    while boxes_delivered < 8:
+    while number_of_bay < 2:
 
         # If paused by button, stop motors and keep LED off
         if emergency_stop:
@@ -872,10 +866,10 @@ def main():
             continue
 
         # Move to the last loading bay spot and check for boxes.
-        # if x:
-        #     shift_with_correction((950//BASE)*40*3)
-        #     x = False
-        # go_to(loading_bays[number_of_bay])
+        if x:
+            shift_with_correction((950//BASE)*40*3)
+            x = False
+        go_to(loading_bays[number_of_bay])
         print('1')
         found_color = seek_and_find(loading_bays[number_of_bay])
         # found_color now contains the color detected by state machine in loading_stage == 3
@@ -926,9 +920,12 @@ def shift_unload():
             go(BASE, BASE)
 
         sleep_ms(DT_MS)
+    
+    
 
 def shift_to_the_box():
-    pass
+    go(100, 100)
+    sleep_ms(800)
 
 
 main()

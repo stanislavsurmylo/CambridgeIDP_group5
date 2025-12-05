@@ -28,8 +28,9 @@ ACTUATOR_DIR_PIN = 3
 ACTUATOR_PWM_PIN = 2
 
 # Timing constants
-ACTUATOR_SPEED = 70
-INIT_RETRACT_TIME = (50/ACTUATOR_SPEED)*10  # Retract to bottommost position
+ACTUATOR_SPEED = 80
+INIT_RETRACT_TIME = (50/(ACTUATOR_SPEED*0.66))*12  # Retract to bottommost position
+INIT_EXTEND_TIME = (50/ACTUATOR_SPEED)*8 # Extend to default position for zone_down
 ZONE_DOWN_EXTEND_TIME = 7.3 # Extend to default position for zone_down
 ZONE_UP_EXTEND_TIME = 0.0  # Extend to default position for zone_up
 LIFT_TIME = 3.0  # Base lift time when starting loading
@@ -39,10 +40,10 @@ MIN_INIT_DISTANCE_CM = 5
 ZONE_PRESET_DISTANCE_CM = 10.0 # Trigger zone preset extend
 COLOR_REFERENCE_DISTANCE_CM = 5  # Trigger color sampling
 LIFT_REFERENCE_DISTANCE_CM = 3 # Trigger lift phase
-LOOP_DELAY = 0.2
+LOOP_DELAY = 0.1
 # Skip initial readings to avoid invalid data (0 values)
 INITIAL_SKIP_COUNT = 3  # Skip first N readings
-INITIAL_DELAY_MS = 1000  # Wait N milliseconds before starting measurement
+INITIAL_DELAY_MS = 100  # Wait N milliseconds before starting measurement
 
 def get_zone_extend_time(zone):
     if zone == 'down':
@@ -52,23 +53,16 @@ def get_zone_extend_time(zone):
     return 0.0
 
 def initialize_actuator_bottom (actuator, zone):   
-    actuator.retract(speed=ACTUATOR_SPEED)  # Maximum speed
+    actuator.retract(speed=ACTUATOR_SPEED*0.66)  # Maximum speed
     sleep(INIT_RETRACT_TIME)
     actuator.stop()
     sleep(0.1)
     print("Reached bottommost position")
     
 def initialize_actuator_down(actuator, zone):
-    actuator.retract(speed=ACTUATOR_SPEED)  # Maximum speed
-    sleep(INIT_RETRACT_TIME)
-    actuator.stop()
-    sleep(0.1)
-    print("Reached bottommost position")
-    # Set default position based on zone
-    zone_extend_time = get_zone_extend_time(zone)
-    print("Setting default position for zone {} (extending for {} seconds)...".format(zone, (50/ACTUATOR_SPEED)*8))
+    print("Setting default position for zone {} (extending for {} seconds)...".format(zone, INIT_EXTEND_TIME))
     actuator.extend(speed=ACTUATOR_SPEED)
-    sleep((50/ACTUATOR_SPEED)*8)
+    sleep(INIT_EXTEND_TIME)
     actuator.stop()
     sleep(0.1)
     print("Actuator initialization complete. Ready for loading.\n")
@@ -325,6 +319,8 @@ def main():
     Runs until a single loading cycle has either completed a lift
     or been reset, then returns to the caller.
     """
+    initialize_actuator_bottom(actuator=Actuator(ACTUATOR_DIR_PIN, ACTUATOR_PWM_PIN), zone='down')
+    initialize_actuator_down(actuator=Actuator(ACTUATOR_DIR_PIN, ACTUATOR_PWM_PIN), zone='down')
     state = LoadingPipelineState()
     while True:
         result = pipeline_step(state)
