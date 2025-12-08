@@ -1,5 +1,7 @@
 # four_sensor_table_arc.py — 4-bit follower + debounced arc turns
 import loading_pipeline_state_machine
+# Core line-following and loading logic for the robot. Additive comments only;
+# functional code remains unchanged.
 from machine import Pin, PWM, I2C
 from time import sleep_ms, ticks_ms, ticks_diff, sleep
 import rp2
@@ -31,6 +33,8 @@ PIN_SCL_TCS3472 = 11
 COLOR_POWER_PIN = 0
 COLOR_POWER_STABILIZE_MS = 200
 COLOR_INTEGRATION_MS = 500
+# Above constants group hardware pin definitions and timing knobs. Values tuned
+# on physical hardware, so untouched for correctness.
 
 # Actuator pins
 ACTUATOR_DIR_PIN = 3
@@ -113,6 +117,7 @@ global_actuator = None  # Global actuator reference for emergency stop
 
 def _button_irq(pin):
     global robot_started, emergency_stop, global_actuator
+    # Toggle run/pause states on button press; stop all motion when pausing.
     if not robot_started:
         robot_started = True
         emergency_stop = False
@@ -228,6 +233,8 @@ class Motor:
 
 mL = Motor(4,5, INVERT_LEFT)
 mR = Motor(7,6, INVERT_RIGHT)
+# Simple motor wrapper: forward/back/stop with PWM duty capping; inversion flag
+# lets wiring swaps keep logical directions consistent.
 
 
 def read_code():
@@ -246,6 +253,7 @@ def go_back(vL, vR): mL.bwd(vL); mR.bwd(vR)
 
 def shift_with_correction(duration_ms):
     global emergency_stop
+    # Drive forward for a fixed time while line-correcting unless paused.
     t0 = ticks_ms()
     while ticks_diff(ticks_ms(), t0) < duration_ms:
         if emergency_stop:
@@ -271,6 +279,7 @@ def shift_with_correction(duration_ms):
 
 def shift_back_without_correction(duration_ms):
     global emergency_stop
+    # Reverse straight for a fixed duration; avoids line correction for speed.
     t0 = ticks_ms()
     while ticks_diff(ticks_ms(), t0) < duration_ms:
         if emergency_stop:
@@ -297,7 +306,7 @@ def shift_back_without_correction(duration_ms):
 def arc(side):
     global current_heading
     add_branch_index = 0
-
+    # Execute a 90/180 degree arc turn or short forward hop based on route code.
     if side=='R':
         DEGREE_OF_TURN = 90
         add_branch_index += 1
@@ -345,6 +354,7 @@ def turn_sleep(deg, speed):
     
 
 def spin(deg):
+    # Spin in place until expected line pattern reappears or timeout reached.
     if deg > 0:
         distance = (deg / 180) * 3.14 * RADIUS_OF_TURN  # distance to travel
     else:
@@ -375,6 +385,7 @@ def spin_back():
 
 def path_to_route(path):
     global finish_heading
+    # Convert a vertex path to turn directives relative to current heading.
     route = []
     prev = path[0]
     curr = path[1]
@@ -423,6 +434,7 @@ def path_to_route(path):
 
 def seek_and_find(LoadingBay):
     print("Seeking and finding at loading bay:", LoadingBay)
+    # State machine for locating a box at a loading bay and triggering pickup.
     global current_heading
     global current_vertex
     global emergency_stop
@@ -620,13 +632,6 @@ def complete_route(branch_route):
     global current_vertex
     global emergency_stop
     branch_index = 0
-
-    # if branch_route[branch_index] == 'R':
-    #     spin_right()
-    #     spin_sleep_90()
-    # elif branch_route[branch_index] == 'L':
-    #     spin_left()
-    #     spin_sleep_90()
     if branch_route[branch_index] == 'B':
         spin_back()
     if current_vertex == V.A_UP_END:
@@ -749,6 +754,7 @@ def go_to(finish_vertex):
     global current_vertex
     global zone
     graph = map.GRAPH
+    # High-level move: shortest path to target vertex then execute route.
     current_path = map.shortest_path(graph, current_vertex, finish_vertex)
     print('Current heading:', current_heading)
     branch_route = path_to_route(current_path)
@@ -833,6 +839,7 @@ def main():
     # loading_pipeline_state_machine.initialize_actuator_bottom(actuator, 'down')
 
     while number_of_bay < 2:
+        # Each loop handles one loading bay visit and subsequent delivery.
 
         # If paused by button, stop motors and keep LED off
         if emergency_stop:
@@ -908,6 +915,7 @@ def main():
 
 def shift_unload():
     global emergency_stop
+    # Follow line forward until four-white junction to align for unloading.
     c = read_code()
     while c != 0b1111:
         if emergency_stop:

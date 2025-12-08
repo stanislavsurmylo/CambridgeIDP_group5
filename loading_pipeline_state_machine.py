@@ -4,6 +4,7 @@ from utime import sleep, ticks_ms, ticks_diff
 from libs.tcs3472 import tcs3472
 from linear_actuator import Actuator
 from libs.tmf8701 import DFRobot_TMF8701
+# State machine for sensing distance/color and driving the linear actuator.
 
 # Zone configuration: "zone_down" or "zone_up"
   # zone down = 1, zone up = 2
@@ -91,6 +92,7 @@ def perform_lift(actuator):
     print("Lift phase complete.")
 
 def setup_sensor_tmf8701():
+    # Distance sensor initialization (shared with main.py when provided).
     i2c = I2C(I2C_ID, sda=Pin(PIN_SDA), scl=Pin(PIN_SCL))
     sensor = DFRobot_TMF8701(i2c)
     if sensor.begin() != 0:
@@ -101,11 +103,13 @@ def setup_sensor_tmf8701():
     return sensor
 
 def setup_sensor_tcs3472():
+    # Lazy-init color sensor; caller controls power separately.
     i2c_bus_tcs3472 = I2C(I2C_ID_TCS3472, sda=Pin(PIN_SDA_TCS3472), scl=Pin(PIN_SCL_TCS3472))
     sensor = tcs3472(i2c_bus_tcs3472)
     return sensor
 
 def detect_color(rgb, light, zone):
+    # Simple ratio-based classifier; thresholds tuned empirically per zone.
     if zone == 'down':
         r, g, b = rgb
         if light < 50 or (r == 0 and g == 0 and b == 0):
@@ -150,6 +154,7 @@ def detect_color(rgb, light, zone):
     return "UNKNOWN"
     
 def sample_color(power_ctrl, tcs3472_sensor=None):
+    # Power on sensor, integrate, read, and power off; returns (light, rgb).
     try:
         sleep(COLOR_POWER_STABILIZE_MS / 1000)
 
@@ -171,6 +176,7 @@ def sample_color(power_ctrl, tcs3472_sensor=None):
         return (0, (0, 0, 0))  # Return default values
 
 def read_distance_cm(sensor):
+    # Wrapper that returns cm or None; isolates I2C errors.
     try:
         if sensor.is_data_ready():
             dist_mm = sensor.get_distance_mm()
@@ -215,6 +221,7 @@ class LoadingPipelineState:
 
 
 def _maybe_delay(state):
+    # Optional cooperative wait to slow the loop when desired.
     if getattr(state, "loop_delay", 0):
         sleep(state.loop_delay)
 

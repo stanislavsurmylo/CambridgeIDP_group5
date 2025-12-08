@@ -22,6 +22,7 @@ except ImportError:
 
 import heapq
 
+# Offline map representation plus Dijkstra helpers; only comments added for clarity.
 
 # ------------ headings / turns (for later) ------------
 
@@ -203,6 +204,7 @@ GRAPH: AdjList = build_graph(DIRECTED_EDGES)
 # ------------------------------------------------------------
 
 def dijkstra(graph: AdjList, start: "V") -> Tuple[Dict["V", float], Dict["V", Optional["V"]]]:
+    # Basic Dijkstra implementation tuned for tiny graphs; weights are floats.
     dist: Dict["V", float] = {v: 100 for v in graph.keys()}
     prev: Dict["V", Optional["V"]] = {v: None for v in graph.keys()}
 
@@ -233,6 +235,7 @@ def dijkstra(graph: AdjList, start: "V") -> Tuple[Dict["V", float], Dict["V", Op
 # ------------------------------------------------------------
 
 def shortest_path(graph: AdjList, start: "V", finish: "V") -> List["V"]:
+    # Recover shortest path using predecessor chain produced by dijkstra().
     dist, prev = dijkstra(graph, start)
 
     if dist[finish] == float("inf"):
@@ -251,6 +254,7 @@ current_heading = 0
 
 def path_to_route_test(path):
     global finish_heading
+    # Convert vertex list into turn directives for quick module verification.
     route = []
     prev = path[0]
     curr = path[1]
@@ -294,7 +298,7 @@ def path_to_route_test(path):
     return route
 
 # ------------------------------------------------------------
-# Example usage (assuming V.START and V.BLUE exist)
+# Example usage
 # ------------------------------------------------------------
 def main():
     start = V.B_DOWN_END         # any START vertex

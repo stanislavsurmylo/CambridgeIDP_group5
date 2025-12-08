@@ -1,5 +1,6 @@
 from machine import Pin, PWM
 from utime import sleep
+# Lightweight helper around a brushed linear actuator using one PWM + one dir pin.
 
 class Actuator:
     def __init__(self, dirPin, PWMPin):
@@ -27,7 +28,7 @@ DIR_PIN = 3
 PWM_PIN = 2
 
 def unload_robot(actuator):
-
+    # Full retract to offload weight before next lift cycle.
     DIR_PIN = 3
     PWM_PIN = 2
     TEST_DURATION = (50/50)*11  # 1 second for testing
@@ -44,7 +45,7 @@ def unload_robot(actuator):
     sleep(0.2)  # Pause so you can measure
 
 def unload_robot_shift(actuator):
-
+    # Short retract for repositioning after unloading.
     DIR_PIN = 3
     PWM_PIN = 2
     TEST_DURATION = (50/50)*4  # 1 second for testing
